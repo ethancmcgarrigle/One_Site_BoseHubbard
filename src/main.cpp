@@ -1,3 +1,5 @@
+#define MAIN
+
 //#include <iostream>
 #include "version.h"
 #include "parameters.h"
@@ -21,7 +23,7 @@ int main(int argc, char **argv)
     double U(1.0), mu(1.0), beta(1.0);
     int Nterms(10);
     bool success;
-    success = parser.getInt("N_terms", {"Numerics"}, Nterms);
+    success = parser.getInt("N_terms", {"numerics"}, Nterms);
     assert(success);
     success &= parser.getDouble("U", {"system"}, U);
     success &= parser.getDouble("mu", {"system"}, mu);
