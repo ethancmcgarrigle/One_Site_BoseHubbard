@@ -39,7 +39,12 @@ int main(int argc, char **argv)
     sum_driver = new Driver(U, mu, beta, Nterms);
 
     // Compute the sum 
-    sum_driver->compute_sum();
+  //  sum_driver->compute_sum();
+    // Order of operations: 1) Compute E_n, 2) compute Z; 3) compute other operators (U and <N>)
+    sum_driver->compute_E_n();
+    sum_driver->compute_Z();
+    sum_driver->compute_U();
+    sum_driver->compute_N();
 
     // Destroy the driver 
     delete sum_driver;
