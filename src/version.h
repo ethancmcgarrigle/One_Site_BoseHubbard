@@ -1,9 +1,9 @@
 #ifndef _VERSION_H_
 #define _VERSION_H_
 
-#define GIT_SHA ""
-#define GIT_BRANCH ""
+#define GIT_SHA "b9114f2ce3-LocalModifications"
+#define GIT_BRANCH "main"
 
-#define PROGNAME "Coherent States C++"
+#define PROGNAME "Mott_insulator_sum_over_states"
 
 #endif // _VERSION_H_
