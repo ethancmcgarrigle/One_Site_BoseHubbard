@@ -1,0 +1,60 @@
+# platform.mk architecture/machine dependent paths and make rules
+
+FFTWPATH=${HOME}/lib/Windows/FFTW-3.3.5_Serial_Win64
+exesuffix := exe
+libsuffix := lib
+
+ifeq ($(PLL),serial)
+  CXX              = /usr/bin/x86_64-w64-mingw32-g++
+
+  CFLAGS           = -g -m64 $(DEFINE)
+
+  OPTFLAGS.release = -D__DISABLESIMD__
+  OPTFLAGS.debug   = -DDEBUG
+  OPTFLAGS.profile = -D__DISABLESIMD__
+
+  INCLUDE         := -I${FFTWPATH}/
+
+  DEFINE          := -DENABLESP
+
+  ASMFLAGS =
+
+  LDFLAGS         = -g -lm -L${FFTWPATH} -llibfftw3-3 -llibfftw3f-3 -static-libstdc++ -static-libgcc
+else ifeq ($(PLL),pll)
+  CXX = mpic++
+
+  CFLAGS           = -g -m64 -fopenmp $(DEFINE)
+
+  OPTFLAGS.release = -O3 -w -DNDEBUG -march=core2 -fexpensive-optimizations -mtune=core2 -mfpmath=both -msse4.2
+  OPTFLAGS.debug   = -O0 -Wall -pedantic -DDEBUG
+  OPTFLAGS.profile = -pg -O3 -w -DNDEBUG -march=core2 -fexpensive-optimizations -mtune=core2 -mfpmath=both -msse4.2
+
+  INCLUDE         := -I${FFTWPATH_DP}/include
+
+  DEFINE          := -DENABLESP -D__OMP__ -D__MPI__
+
+  ASMFLAGS  = -masm=intel
+
+  LDFLAGS         = -g -fopenmp -lm -L${FFTWPATH_DP}/lib -L${FFTWPATH_SP}/lib -lfftw3_mpi -lfftw3f_mpi -lfftw3_omp -lfftw3f_omp -lfftw3 -lfftw3f -static
+else ifeq ($(PLL),gpu)
+  CXX = nvcc
+
+  CFLAGS            = -ccbin /usr/bin/g++-4.7 -arch sm_20 -use_fast_math $(DEFINE)
+
+  OPTFLAGS.release  = -O3
+  OPTFLAGS.debug    = -g -O0 -DDEBUG
+  OPTFLAGS.profile  = -lineinfo -g -Xcompiler "-g -pg" -O3
+
+  INCLUDE   = -I/usr/local/cuda/include
+
+  DEFINE          := -DENABLESP -D__GPU__ -D_FORCE_INLINES
+
+  ASMFLAGS  =
+
+  LDFLAGS         = -lcufft_static -lcurand_static -lculibos
+else
+  $(error Parallel option not enabled for this machine / platform : $(PLL))
+endif
+
+# Select specific set of OPTFLAGS and LDFLAGS according to BUILD option
+OPTFLAGS := $(OPTFLAGS.$(BUILD))

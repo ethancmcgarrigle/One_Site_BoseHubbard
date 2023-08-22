@@ -1,0 +1,9 @@
+#ifndef _VERSION_H_
+#define _VERSION_H_
+
+#define GIT_SHA "hash"
+#define GIT_BRANCH "branch"
+
+#define PROGNAME "Coherent States C++"
+
+#endif // _VERSION_H_
