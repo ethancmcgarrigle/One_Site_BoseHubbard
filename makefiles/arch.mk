@@ -1,6 +1,6 @@
 # platform.mk architecture/machine dependent paths and make rules
 
-#FFTWPATH= ~/libraries/fftw-3.3.10
+FFTWPATH= ~/libraries/fftw-3.3.10
 BOOSTPATH= ~/libraries/boost_1_81_0
 
 ifeq ($(PLL),serial)
@@ -14,11 +14,11 @@ ifeq ($(PLL),serial)
   OPTFLAGS.profile := -pg -O3 -w -DNDEBUG -march=native -fexpensive-optimizations -mtune=native -mavx2
   OPTFLAGS.coverage:= -O0 -DDEBUG -fprofile-arcs -ftest-coverage
 
-  INCLUDE          := -I./include/yaml-cpp/include -I ${BOOSTPATH}
+  INCLUDE          := -I ${FFTWPATH}/api -I./include/yaml-cpp/include -I ${BOOSTPATH}
 
   ASMFLAGS         := #-masm=intel
 
-  LDFLAGS          := -g -lm -L./include/yaml-cpp -lyaml-cpp_linux64
+  LDFLAGS          := -g -lm -L${FFTWPATH} -lfftw3 -L./include/yaml-cpp -lyaml-cpp_linux64
 
 else ifeq ($(PLL),pll)
   CXX              := g++
@@ -31,14 +31,14 @@ else ifeq ($(PLL),pll)
   OPTFLAGS.profile := -pg -O3 -w -DNDEBUG -march=native -fexpensive-optimizations -mtune=native -mavx2
   OPTFLAGS.coverage:= -O0 -w -DDEBUG -fprofile-arcs -ftest-coverage
 
-  INCLUDE          := -I./include/yaml-cpp/include -I ${BOOSTPATH}
+  INCLUDE          := -I${FFTWPATH}/api -I./include/yaml-cpp/include -I ${BOOSTPATH}
 
   DEFINE           += -D__OMP__
 
   ASMFLAGS         := -masm=intel
 
   # Note that this is combined with CFLAGS when linking, so -fopenmp will be present
-  LDFLAGS          := -lm -L./include/yaml-cpp -lyaml-cpp_linux64
+  LDFLAGS          := -lm -L${FFTWPATH} -lfftw3_omp -lfftw3 -L./include/yaml-cpp -lyaml-cpp_linux64
 else ifeq ($(PLL),gpu)
   CXX              := nvcc  
 
@@ -64,7 +64,7 @@ else ifeq ($(PLL),gpu)
   # ln -s `g++ $(CXXFLAGS) -print-file-name=libstdc++.a` libstdc++.a to get a link to the system .a file in the current location, and add -L. to linker arguments.
   #
   # Dynamic linking with added RPATH for this machine.
-  LDFLAGS         := -lcurand -L./include/yaml-cpp -lyaml-cpp_linux64
+  LDFLAGS         := -lcufft -lcurand -L./include/yaml-cpp -lyaml-cpp_linux64
 else
   $(error Parallel option not enabled for this machine / platform : $(PLL))
 endif
