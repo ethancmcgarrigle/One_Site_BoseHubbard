@@ -1,47 +1,54 @@
 import numpy as np
 import math 
 import matplotlib
-matplotlib.use('Tkagg')
+#matplotlib.use('Tkagg')
+#matplotlib.rcParams['text.usetex'] = True
 import matplotlib.pyplot as plt 
+import pdb
 
 
 # Code to run auxiliary field boson hubbard model for 1 site  
-
- #def compute_exp(U, mu, beta, w):
- #  x = beta * (mu + 0.5*U - w*1j)
- #  #x = beta * (mu - w*1j)
- #  return np.exp(-x)
- #
- #
- #def compute_N(U, mu, beta, w):
- #  N = 0. + 1j * 0
- #  N = compute_exp(U, mu, beta, w) 
- #  N -= 1.  
- #  N = 1./N
- #  return N
-
-
- #def compute_w_force(U, mu, beta, w, ntau):
- #  F = np.zeros(ntau, dtype=np.complex_) # dS/dw 
- #  #F = compute_N(U, mu, beta, w) 
- #  #F *= 1j*beta 
- #  #F += beta*U*w
- #  det, F = calc_det(beta, ntau, mu, U, w)
- #  return F
-
-
 def tstep_EM(_w, wforce, dt, mobility, applynoise):
   # Step
   _w += (-wforce * dt * mobility) # += op will modify _w as intended   
-
+  dV = 1. 
+  scale = np.sqrt(2. * mobility * dt / dV)
   # Mean field or CL? 
+  Ntau = len(_w)
   if(applynoise):
     # Generate noise 
-    w_noise = np.random.normal(0., np.sqrt(2. * dt * _mobility), ntau) # real noise
+    #w_noise = np.random.normal(0., np.sqrt(2. * dt * _mobility), ntau) # real noise
+    #w_noise = np.random.normal(0., np.sqrt(2. * dt * _mobility), Ntau) # real noise
+    w_noise = np.zeros(len(_w), dtype=np.complex_)
+    w_noise += np.random.normal(0., 1., Ntau) # real noise
+    w_noise *= scale
     _w += w_noise
 
   return _w
 
+
+ #def tstep_ETD(_w, lincoef, nonlinforce, nonlinforce_coef, dt, mobility, applynoise):
+ #  # Step
+ #  _w *= lincoef # e^{-dt * mobility * beta U / ntau)
+ #  _w += (-wforce * nonlinforce_coef) # += op will modify _w as intended   
+ #
+ #  dV = 1.
+ #  scale = np.sqrt(2. * mobility * dt / dV)
+ #  # Mean field or CL? 
+ #  Ntau = len(_w)
+ #  if(applynoise):
+ #    # Generate noise 
+ #    #w_noise = np.random.normal(0., np.sqrt(2. * dt * _mobility), ntau) # real noise
+ #    #w_noise = np.random.normal(0., np.sqrt(2. * dt * _mobility), Ntau) # real noise
+ #    w_noise = np.random.normal(0., 1., Ntau) # real noise
+ #    w_noise *= scale
+ #    _w += w_noise
+ #
+ #  return _w
+ #
+
+def Nk_Bose(beta, mu):
+  return 1./(np.exp(-beta * mu) - 1.)
 
 
 def calc_det_fxns(beta, ntau, mu, U, w_field):
@@ -49,44 +56,51 @@ def calc_det_fxns(beta, ntau, mu, U, w_field):
   #offdiag_vec = np.zeros(ntau, dtype=np.complex_)
   # fill the vector  
   offdiag_vec = np.zeros(ntau, dtype=np.complex_)
-  offdiag_vec += w_field*1j * U
-  offdiag_vec += -0.5*U
-  offdiag_vec += -mu 
-  offdiag_vec *= -beta / ntau
+ #  print('w_field: ')
+ #  print(w_field)
+ #  print()
+  offdiag_vec += w_field
+  offdiag_vec *= 1j * U 
+  #offdiag_vec += +0.5 * U # not included? 
+  offdiag_vec += mu 
+  offdiag_vec *= beta / ntau
   offdiag_vec += 1.  # a_j 
 
+  #print(offdiag_vec)
   # calculate the determinant as 1 -  prod(offdiag_vec_j) for all j 
   prod = offdiag_vec.prod()
-  if(ntau % 2 == 0):
-    sign = 1. 
-  else:
-    sign = -1. 
-
-  det = 1. - prod*sign  # +??  (-1) ** (2*ntau - 1) , therefore a minus sign overall for even ntau 
+  #if(ntau / 2 == 0): # e.g. any integer ntau 
+ #  if(float(ntau).is_integer()): # e.g. any integer ntau 
+ #    sign = 1. 
+ #  else:
+ #    sign = -1. 
+  det = 1. - prod 
 
   # Now that we've gotten det(S) and prod(aj); calc observables and forces 
   N_operator = 0. + 1j*0.
-  dS_d_det = np.zeros(ntau,dtype=np.complex_)
-  dS_d_det += prod
-  dS_d_det /= offdiag_vec  # prod(aj)prime 
-  N_operator += np.sum(dS_d_det)
-  dS_d_det *= 1j * beta * U  * sign /ntau
-  dS_d_det /= det
+  ddet_dw = np.zeros(ntau,dtype=np.complex_)
+  ddet_dw += prod
+  #ddet_dw /= np.roll(offdiag_vec, 4) 
+  ddet_dw /= offdiag_vec
+  N_operator += np.sum(ddet_dw)
+  #ddet_dw *= 1j * beta * U  / float(ntau)
+  ddet_dw *= 1j * beta * U  / float(ntau)
+  ddet_dw /= det
 
   # Linear part 
   dS_dw = np.zeros(ntau, dtype=np.complex_) 
   dS_dw += w_field 
-  dS_dw *= beta * U / ntau 
+  dS_dw *= U * beta / ntau 
 
   # nonlinear part  
-  #dS_dw -= dS_d_det 
-  dS_dw += dS_d_det 
+  dS_dw += ddet_dw # correct 
+  #dS_dw -= ddet_dw 
 
-  #N_operator *= sign * -1
-  N_operator *= sign 
+  ##N_operator *= sign * -1
+  N_operator *= 1. # I think this is correct; and it works for IG
   N_operator /= ntau
   N_operator /= det
- 
+
  #  print()
  #  print('Det(S): \n' )
  #  print(det)
@@ -95,14 +109,17 @@ def calc_det_fxns(beta, ntau, mu, U, w_field):
  #  print('dS_dw_j): \n' )
  #  print(dS_d_det)
  #  print()
+  #pdb.set_trace() 
   return (dS_dw, N_operator)
 
 
 ## System ## 
-_U = 0.00
-_beta = 0.5
-_mu = -0.0001
-ntau = 5000
+_U = 1.0
+_beta = 1.00
+_mu = 1.10
+#ntau = 56
+ntau = 2
+_T = 1./_beta
 print(' Temperature: ' + str(1./_beta) + '\n')
 #print(' mu/U: ' + str(_mu/_U) + '\n')
 
@@ -112,16 +129,19 @@ _w = np.zeros(ntau, dtype=np.complex_)
 _wforce = np.zeros(ntau, dtype=np.complex_)  
 
 # initialize w field 
+#_w += (_mu) * 1j
 #_w += (_mu / _U) * 1j
 
 ## Numerics ## 
-_dt = 0.025
+_dt = 0.02
 #numtsteps = int(1E6)
-numtsteps = int(20000)
+numtsteps = int(100000)
+#numtsteps = int(2)
+#numtsteps = int(100)
 iointerval = 500
 #iointerval = 1
 _isEM = True
-_mobility = 25.0 
+_mobility = 10.0 
 _applynoise = True
 _MF_tol = 1E-6
 
@@ -183,7 +203,8 @@ thermal_avg_N = np.mean(Partnum_per_site_samples)
 thermal_avg_w = np.mean(_w_samples)
 
 if(_applynoise):
-  print('Average particle number : ' + str(thermal_avg_N.real) + '\n')
+  print('Average particle number (real) : ' + str(thermal_avg_N.real) + '\n')
+  print('Average particle number (imag) : ' + str(thermal_avg_N.imag) + '\n')
   print('Average _w imaginary value: ' + str(thermal_avg_w.imag) + '\n')
   print('Average _w real value: ' + str(thermal_avg_w.real) + '\n')
 
@@ -192,26 +213,31 @@ if(_applynoise):
 plt.style.use('~/CSBosonsCpp/tools/Figs_scripts/plot_style_orderparams.txt')
 
 if(_isPlotting):
-  plt.figure(figsize=(8., 8.))
-  plt.plot(range(0, N_samples), Partnum_per_site_samples.real, marker='o', color = 'k', markersize = 4, linewidth = 2., label = 'Re[N]')
-  plt.plot(range(0, N_samples), Partnum_per_site_samples.imag, marker='x', color = 'r', markersize = 4, linewidth = 2., label = 'Im[N]')
-  plt.xlabel('Iterations', fontsize = 22)
-  plt.ylabel('$N$', fontsize = 22)
+  plt.figure(figsize=(6., 6.))
+  plt.plot(np.array(range(0, N_samples)) * float(iointerval), Partnum_per_site_samples.real, marker='o', color = 'k', markersize = 4, linewidth = 2., label = 'Re[N]')
+  plt.plot(np.array(range(0, N_samples)) * float(iointerval), Partnum_per_site_samples.imag, marker='x', color = 'r', markersize = 4, linewidth = 2., label = 'Im[N]')
+  if(_U == 0):
+    plt.axhline(y = Nk_Bose(_beta, _mu), color = 'k', linestyle = 'dashed', label = r'Exact, Ideal gas ($N_{\tau} \to \infty$)') 
+  else:
+    plt.axhline(y = 1.85, color = 'k', linestyle = 'dashed', label = r'Exact, Sum over states') 
+  plt.title('$T = ' + str(_T) + '$, $\mu = $ ' + str(_mu) + ', $U = ' + str(_U) + '$',fontsize = 16)
+  plt.xlabel('Iterations', fontsize = 28)
+  plt.ylabel('$N$', fontsize = 28)
   plt.legend()
   plt.show()
 
-  plt.figure(figsize=(8., 8.))
-  plt.plot(range(0, N_samples), _w_samples.real, marker='o', color = 'k', markersize = 4, linewidth = 2., label = 'Re[w]')
-  plt.plot(range(0, N_samples), _w_samples.imag, marker='p', color = 'b', markersize = 4, linewidth = 2., label = 'Im[w]')
-  plt.xlabel('Iterations', fontsize = 22)
-  plt.ylabel('$w$', fontsize = 22)
+  plt.figure(figsize=(6., 6.))
+  plt.plot(np.array(range(0, N_samples)) * float(iointerval), _w_samples.real, marker='o', color = 'k', markersize = 4, linewidth = 2., label = 'Re[w]')
+  plt.plot(np.array(range(0, N_samples)) * float(iointerval), _w_samples.imag, marker='p', color = 'b', markersize = 4, linewidth = 2., label = 'Im[w]')
+  plt.xlabel('Iterations', fontsize = 28)
+  plt.ylabel('$w$', fontsize = 28)
   plt.legend()
   plt.show()
   
-  plt.figure(figsize=(8., 8.))
+  plt.figure(figsize=(6., 6.))
   plt.plot(_w_samples.real, _w_samples.imag, marker='o', color = 'k', markersize = 4, linewidth = 2., label = 'Aux. Field Theory')
-  plt.xlabel('Re[$w$]', fontsize = 22)
-  plt.ylabel('Im[$w$]', fontsize = 22)
+  plt.xlabel('Re[$w$]', fontsize = 28)
+  plt.ylabel('Im[$w$]', fontsize = 28)
   plt.legend()
   plt.show()
   
