@@ -43,10 +43,7 @@ else ifeq ($(PLL),gpu)
   CXX              := nvcc  
 
   # CFLAGS is recursively expanded so we can keep adding to DEFINE
-  #CFLAGS            = -lineinfo -std=c++11 -g -use_fast_math $(DEFINE) -Xcompiler "-std=c++11"
-  CFLAGS            = -std=c++11 -lineinfo -g --Wno-deprecated-gpu-targets -arch sm_86 -use_fast_math $(DEFINE) -Xcompiler "-std=c++11"
-  #CFLAGS            = -std=c++11 -lineinfo -g --Wno-deprecated-gpu-targets -arch compute_37 -code sm_37 -code sm_60 -code sm_70 -code sm_80 -use_fast_math $(DEFINE) -Xcompiler "-std=c++11"
-
+  CFLAGS            = -lineinfo -std=c++11 -g -use_fast_math $(DEFINE) -Xcompiler "-std=c++11"
 
   OPTFLAGS.release := -O3
   OPTFLAGS.debug   := -O0 -DDEBUG
