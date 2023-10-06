@@ -71,19 +71,12 @@ void Driver::compute_E_n()
 //  }); 
 
 
-  //E_n += double(_n);
+  //E_n += double(_n) * double(_n);
   // += operation
   std::transform(E_n.begin(), E_n.end(), _n.begin(), E_n.begin(), [](double& a, int b) {
     a += double(b) * double(b);
     return a;
   }); 
-
-  
-  //E_n *= double(_n);
- //  std::transform(E_n.begin(), E_n.end(), _n.begin(), E_n.begin(), [](double& a, int b) {
- //    a *= double(b);
- //    return a;
- //  }); 
 
   //E_n *= _U/2.;
   double factor(0.); 
