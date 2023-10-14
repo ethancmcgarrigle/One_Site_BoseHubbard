@@ -1,6 +1,6 @@
 system:
-   U:        25.00
-   mu:       0.4
+   U:        1.00
+   mu:       1.1
    beta:     1.0
 
 numerics:

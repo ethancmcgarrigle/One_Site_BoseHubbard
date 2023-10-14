@@ -46,8 +46,8 @@ _wforce = 0. + 1j*0.
 
 # TODO add parser 
 ## System ## 
-_U = 0.5
-_beta = 50.0
+_U = 1.0
+_beta = 1.0
 _mu = 2.6
 print(' Temperature: ' + str(1./_beta) + '\n')
 print(' mu/U: ' + str(_mu/_U) + '\n')

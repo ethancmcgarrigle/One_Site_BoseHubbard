@@ -10,11 +10,13 @@ import pdb
 # Code to run auxiliary field boson hubbard model for 1 site  
 def tstep_EM(_w, wforce, dt, mobility, applynoise):
   # Step
-  _w += (-wforce * dt * mobility) # += op will modify _w as intended   
+  Ntau = len(_w)
+  #print(wforce[1])
+  _w -= (wforce * dt * mobility) # += op will modify _w as intended   
   dV = 1. 
   scale = np.sqrt(2. * mobility * dt / dV) 
+  #scale = np.sqrt(mobility * dt / Ntau ) 
 
-  Ntau = len(_w)
   # Mean field or CL? 
   if(applynoise):
     # Generate noise 
@@ -22,7 +24,7 @@ def tstep_EM(_w, wforce, dt, mobility, applynoise):
     #w_noise = np.random.normal(0., np.sqrt(2. * dt * _mobility), Ntau) # real noise
     w_noise = np.zeros(len(_w), dtype=np.complex_)
     w_noise += np.random.normal(0., 1., Ntau) # real noise
-    w_noise *= scale
+    w_noise *= scale / 6.0
     _w += w_noise
 
   return _w
@@ -54,50 +56,40 @@ def Nk_Bose(beta, mu):
 
 def calc_det_fxns(beta, ntau, mu, U, w_field):
   # Matrix has PBC structure, so just fill a CSfield (vector for single site) of 
-  #offdiag_vec = np.zeros(ntau, dtype=np.complex_)
   # fill the vector  
   offdiag_vec = np.zeros(ntau, dtype=np.complex_)
-  offdiag_vec += w_field * 1j * U 
-  #offdiag_vec += w_field * 1j * np.sqrt(U) / np.sqrt(beta/ntau) 
-  #offdiag_vec *= 1j * U / ntau ** (1/2) 
-  #offdiag_vec *= 1j * np.sqrt(U) / (np.sqrt(beta/ntau)) 
-  #offdiag_vec *= np.sqrt(U) 
-  offdiag_vec += -U * 0.5
-  offdiag_vec += -mu 
-  offdiag_vec *= -beta / ntau
+  offdiag_vec += w_field
+  E_tot = beta * 1j * U * np.sum(offdiag_vec) / ntau
+  E_tot += 0.5 * U * beta 
+  E_tot += mu * beta
 
-  E_tot = np.sum(offdiag_vec)
-  #E_tot *= -beta / ntau
   exp_factor = np.exp(E_tot) # e^{-\Delta_{\tau} \sum_{j} E_{j} }
+  det = 1. - exp_factor
   exp_minus_factor = 1./exp_factor 
-  #exp_minus_factor = np.exp(-E_tot) 
 
   # Calc N_operator  
   N_operator = 0. + 1j*0.
-  N_operator += 1./(exp_minus_factor - 1.) 
-  #N_operator += 1./(exp_factor - 1.) 
+  N_operator = 1./(exp_minus_factor - 1.)
 
   # Linear part 
   dS_dw = np.zeros(ntau, dtype=np.complex_) 
-  dS_dw += w_field 
-  dS_dw *= U * beta / ntau 
+  dS_dw += w_field  
+  dS_dw *= U * beta / ntau
 
   # nonlinear part  
-  dS_dw += N_operator * 1j * U * beta / ntau # method 1 
-  #dS_dw += N_operator * 1j * np.sqrt(U * beta / ntau) # method 2 
+  dS_dw += -N_operator * 1j * U * beta / ntau
 
   # output 
   return (dS_dw, N_operator)
 
 
 ## System ## 
-_U = 1.0
+_U = 10.0
 #_U = 0.0
 _beta = 1.00
 _mu = 1.10
 #_mu = -0.10
-#ntau = 56
-ntau = 100
+ntau = 40
 _T = 1./_beta
 print(' Temperature: ' + str(1./_beta))
 print(' Imaginary time discertization: ' + str(_beta / ntau) + '\n')
@@ -111,17 +103,20 @@ _wforce = np.zeros(ntau, dtype=np.complex_)
 
 # initialize w field 
 #_w += -(_mu) * 1j
-#_w += (_mu / _U) * 1j
+_shift = +10
+_w += (_mu/_U) + 0.5 + _shift 
+_w *= 1j
 
 ## Numerics ## 
-_dt = 0.01
+_dt = 0.001
 #numtsteps = int(1E6)
-numtsteps = int(100000)
+numtsteps = int(20000)
 #numtsteps = int(2)
 #numtsteps = int(100)
-iointerval = 500
+iointerval = 100
 #iointerval = 1
 _isEM = True
+#_mobility = 1.0
 _mobility = 1.0 * ntau 
 _applynoise = True
 _MF_tol = 1E-6
@@ -147,7 +142,7 @@ for i in range(0, numtsteps):
 
   N_sample = 0. + 1j*0.
   _wforce, N_sample = calc_det_fxns(_beta, ntau, _mu, _U, _w)
-  #print(_wforce)
+  #print(_wforce[0])
   #print(N_sample)
   
   # step/propagate the field 

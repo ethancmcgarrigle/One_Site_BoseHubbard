@@ -10,11 +10,13 @@ import pdb
 # Code to run auxiliary field boson hubbard model for 1 site  
 def tstep_EM(_w, wforce, dt, mobility, applynoise):
   # Step
-  _w += (-wforce * dt * mobility) # += op will modify _w as intended   
-  dV = 1. 
-  scale = np.sqrt(2. * mobility * dt / dV ) 
-
   Ntau = len(_w)
+  #print(wforce[1])
+  _w = _w - (wforce * dt * mobility) # += op will modify _w as intended   
+  dV = 1. 
+  scale = np.sqrt(2. * mobility * dt / dV) 
+  #scale = np.sqrt(mobility * dt / Ntau ) 
+
   # Mean field or CL? 
   if(applynoise):
     # Generate noise 
@@ -22,7 +24,7 @@ def tstep_EM(_w, wforce, dt, mobility, applynoise):
     #w_noise = np.random.normal(0., np.sqrt(2. * dt * _mobility), Ntau) # real noise
     w_noise = np.zeros(len(_w), dtype=np.complex_)
     w_noise += np.random.normal(0., 1., Ntau) # real noise
-    w_noise *= scale 
+    w_noise *= scale
     _w += w_noise
 
   return _w
@@ -57,83 +59,57 @@ def calc_det_fxns(beta, ntau, mu, U, w_field):
   #offdiag_vec = np.zeros(ntau, dtype=np.complex_)
   # fill the vector  
   offdiag_vec = np.zeros(ntau, dtype=np.complex_)
- #  print('w_field: ')
- #  print(w_field)
- #  print()
-  offdiag_vec += w_field
-  offdiag_vec *= +1j * U 
-  #offdiag_vec *= 1j * .sqrt(U) / (np.sqrt(beta/ntau)) 
-  #offdiag_vec += 0.5 * U 
-  offdiag_vec += mu 
-  offdiag_vec *= beta / ntau
-  #offdiag_vec = np.exp(offdiag_vec)
-  offdiag_vec += 1.  # a_j 
+  offdiag_vec += w_field * 1j * U 
+  #offdiag_vec += -w_field * w_field * beta / ntau 
+  #offdiag_vec += w_field * w_field * beta / ntau 
+  #offdiag_vec += w_field * 1j * np.sqrt(U) / np.sqrt(beta/ntau) 
+  #offdiag_vec *= 1j * np.sqrt(U) / (np.sqrt(beta/ntau)) 
+  offdiag_vec += -0.5 * U 
+  offdiag_vec += -mu 
+  offdiag_vec *= -beta / ntau
 
-  #print(offdiag_vec)
-  # calculate the determinant as 1 -  prod(offdiag_vec_j) for all j 
-  #offdiag_vec = 1./offdiag_vec
-  prod = offdiag_vec.prod()
-  #if(ntau / 2 == 0): # e.g. any integer ntau 
- #  if(float(ntau).is_integer()): # e.g. any integer ntau 
- #    sign = 1. 
- #  else:
- #    sign = -1. 
-  detS = 1. - prod
+  E_tot = np.sum(offdiag_vec)
+  exp_factor = np.exp(E_tot) # e^{-\Delta_{\tau} \sum_{j} E_{j} }
+  #exp_factor = np.exp(offdiag_vec) # e^{-\Delta_{\tau} \sum_{j} E_{j} }
+  exp_minus_factor = 1./exp_factor 
+  #exp_minus_factor = np.exp(-E_tot) 
 
-  # check the determinant via a matrix operation 
- #  print()
- #  S = np.diag(np.ones(ntau, dtype=complex)) 
- #  subdiag = np.diag(offdiag_vec[0:-1], k=-1) 
- #  S += subdiag
- #  S[0,-1] = offdiag_vec[-1]
- #
- #  print(S)
- #  print()
- #  print('Calculating determinant: ' + str(np.linalg.det(S)))
- #  print('Manually: ' + str(det))
-  #det = np.exp(-prod) 
-
-  # Now that we've gotten det(S) and prod(aj); calc observables and forces 
+  # Calc N_operator  
   N_operator = 0. + 1j*0.
-  ddet_dw = np.zeros(ntau,dtype=np.complex_)
-  ddet_dw += prod
-  ddet_dw /= offdiag_vec
-  N_operator += np.sum(ddet_dw)
-  ddet_dw *= 1j * beta * U  / float(ntau)
-  #ddet_dw *= 1j * np.sqrt(beta * U  / float(ntau))
-  ddet_dw /= detS
+  #N_operator += np.sum(1./(exp_factor - 1.)) 
+  N_operator = 1./(exp_minus_factor - 1.)
+  #print(N_operator)
+  #N_operator += mu/U 
+  #N_operator += 1./(exp_factor - 1.) 
 
   # Linear part 
   dS_dw = np.zeros(ntau, dtype=np.complex_) 
-  dS_dw += w_field 
+  dS_dw += w_field  
+  #dS_dw -= np.roll(w_field, +1) 
   dS_dw *= U * beta / ntau
 
   # nonlinear part  
-  dS_dw += ddet_dw # correct 
-  #dS_dw -= ddet_dw 
+  #dS_dw += 0. 
+  dS_dw += -N_operator * beta *  (1j * U) / ntau 
+  #dS_dw += -N_operator * beta *  (1j * U + -w_field * beta / ntau) / ntau
+  #dS_dw += N_operator * 1j * U / ntau 
+  #dS_dw += N_operator * 1j * U * beta / (ntau) / np.exp(w_field * 1j * U * beta/ntau)  # method 1 
+  #dS_dw += N_operator * 1j * U * beta / (ntau) / np.exp(offdiag_vec)  # method 1 
+  #dS_dw += N_operator * 1j * np.sqrt(U * beta / ntau) # method 2 
 
-  N_operator *= 1. # I think this is correct; and it works for IG
-  N_operator /= ntau
-  N_operator /= detS
-
- #  print()
- #  print('Det(S): \n' )
- #  print(det)
- #  print()
- #
- #  print('dS_dw_j): \n' )
- #  print(dS_d_det)
- #  print()
-  #pdb.set_trace() 
+  # output 
   return (dS_dw, N_operator)
 
 
 ## System ## 
 _U = 1.0
+#_U = 0.0
 _beta = 1.00
 _mu = 1.10
-#ntau = 56
-ntau = 100
+#_mu = -0.10
+ntau = 56
+#ntau = 100
+#ntau = 1
 _T = 1./_beta
 print(' Temperature: ' + str(1./_beta))
 print(' Imaginary time discertization: ' + str(_beta / ntau) + '\n')
@@ -147,17 +123,18 @@ _wforce = np.zeros(ntau, dtype=np.complex_)
 
 # initialize w field 
 #_w += -(_mu) * 1j
-#_w += (_mu / _U) * 1j
+#_w += (-_mu / _U) * 1j
 
 ## Numerics ## 
 _dt = 0.01
 #numtsteps = int(1E6)
-numtsteps = int(100000)
+numtsteps = int(50000)
 #numtsteps = int(2)
 #numtsteps = int(100)
 iointerval = 500
 #iointerval = 1
 _isEM = True
+#_mobility = 1.0
 _mobility = 1.0 * ntau 
 _applynoise = True
 _MF_tol = 1E-6
@@ -183,7 +160,8 @@ for i in range(0, numtsteps):
 
   N_sample = 0. + 1j*0.
   _wforce, N_sample = calc_det_fxns(_beta, ntau, _mu, _U, _w)
-  #print(_wforce)
+  #print(_wforce[0])
+  #print(N_sample)
   
   # step/propagate the field 
   #print('w before' + str(_w.real) + ' complex ' + str(_w.imag))
