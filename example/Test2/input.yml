@@ -1,0 +1,7 @@
+system:
+   U:        0.10
+   mu:       1.1
+   beta:     1.0
+
+numerics:
+   N_terms:   20000

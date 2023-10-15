@@ -16,7 +16,7 @@ def tstep_EM(_w, wforce, dt, mobility, applynoise):
   dV = 1. 
   scale = np.sqrt(2. * mobility * dt / dV) 
   #scale = np.sqrt(mobility * dt / Ntau ) 
-  noise_pcnt = 0.25
+  noise_pcnt = 1.00
 
   # Mean field or CL? 
   if(applynoise):
@@ -80,6 +80,16 @@ def calc_det_fxns(beta, ntau, mu, U, w_field):
   # nonlinear part  
   dS_dw += -N_operator * 1j * U * beta / ntau
 
+  k = 40
+  # Add a penalty
+  penalty = np.zeros(ntau, dtype=np.complex_) 
+  penalty += -2 * k * 1j / ntau
+  analytical_lim = mu/U + 0.5
+  penalty /= 1. + np.exp(2*k * (np.sum(-w_field*1j)/ntau - analytical_lim) )
+  #print(np.mean(penalty))
+  dS_dw += penalty
+
+  N_operator += (2*k/U) / (1. + np.exp(2*k * (np.sum(-w_field*1j)/ntau - analytical_lim) ) )
   # output 
   return (dS_dw, N_operator)
 
@@ -90,7 +100,7 @@ _U = 1.0
 _beta = 1.00
 _mu = 1.10
 #_mu = -0.10
-ntau = 100
+ntau = 1
 _T = 1./_beta
 print(' Temperature: ' + str(1./_beta))
 print(' Imaginary time discertization: ' + str(_beta / ntau) + '\n')
@@ -114,7 +124,7 @@ _dt = 0.005
 numtsteps = int(90000)
 #numtsteps = int(2)
 #numtsteps = int(100)
-iointerval = 100
+iointerval = 400
 #iointerval = 1
 _isEM = True
 #_mobility = 1.0
