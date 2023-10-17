@@ -80,18 +80,26 @@ def calc_det_fxns(beta, ntau, mu, U, w_field):
   # nonlinear part  
   dS_dw += -N_operator * 1j * U * beta / ntau
 
-  k = 40
+  k = 10
+  #k = 0
   # Add a penalty
   penalty = np.zeros(ntau, dtype=np.complex_) 
-  penalty += -2 * k * 1j / ntau
-  analytical_lim = mu/U + 0.5
-  penalty /= 1. + np.exp(2*k * (np.sum(-w_field*1j)/ntau - analytical_lim) )
+  penalty += -2 * k * 1j * beta / ntau
+  #penalty += -2 * k * 1j / ntau
+  shift = 0.0
+  #analytical_lim = mu/U + shift
+  analytical_lim = mu/U + 0.5 + shift
+  penalty /= (1. + np.exp(2*k * (np.sum(-w_field*1j)/ntau - analytical_lim) ))
   #print(np.mean(penalty))
-  dS_dw += penalty
+  dS_dw += penalty 
 
-  N_operator += (2*k/U) / (1. + np.exp(2*k * (np.sum(-w_field*1j)/ntau - analytical_lim) ) )
+  N_operator += (2*k/beta * U) / (1. + np.exp(2*k * (np.sum(-w_field)*1j/ntau - analytical_lim) ) ) 
+
+  N_operator_sq = 0. + 1j*0.
+  N_operator_sq = N_operator * N_operator
+
   # output 
-  return (dS_dw, N_operator)
+  return (dS_dw, N_operator, N_operator_sq)
 
 
 ## System ## 
@@ -114,17 +122,15 @@ _wforce = np.zeros(ntau, dtype=np.complex_)
 
 # initialize w field 
 #_w += -(_mu) * 1j
-_shift = +4
+_shift = +1.00
 _w += (_mu/_U) + 0.5 + _shift 
 _w *= 1j
 
 ## Numerics ## 
-_dt = 0.005
-#numtsteps = int(1E6)
-numtsteps = int(90000)
-#numtsteps = int(2)
-#numtsteps = int(100)
-iointerval = 400
+_dt = 0.01
+numtsteps = int(1E6)
+#numtsteps = int(50000)
+iointerval = 2000
 #iointerval = 1
 _isEM = True
 #_mobility = 1.0
@@ -138,10 +144,12 @@ _isPlotting = True
 
 # Operators 
 N_avg = 0. + 1j*0.
+N2_avg = 0. + 1j*0.
 assert((numtsteps/iointerval).is_integer())
-N_samples = int(numtsteps/iointerval)
-Partnum_per_site_samples = np.zeros(N_samples, dtype=np.complex_) 
-_w_samples = np.zeros(N_samples, dtype=np.complex_) 
+Num_samples = int(numtsteps/iointerval)
+Partnum_per_site_samples = np.zeros(Num_samples, dtype=np.complex_) 
+N2_per_site_samples = np.zeros(Num_samples, dtype=np.complex_) 
+_w_samples = np.zeros(Num_samples, dtype=np.complex_) 
 ctr = 0
 
 print('Starting simulation')
@@ -152,7 +160,12 @@ for i in range(0, numtsteps):
   #detS, _wforce, N_operator += compute_w_force(_U, _mu, _beta, _w, ntau) 
 
   N_sample = 0. + 1j*0.
-  _wforce, N_sample = calc_det_fxns(_beta, ntau, _mu, _U, _w)
+  N2_sample = 0. + 1j*0.
+  _wforce, N_sample, N2_sample = calc_det_fxns(_beta, ntau, _mu, _U, _w)
+
+  if(np.isnan(N_sample)):
+    print('Trajectory diverged. Particle number is nan, ending simulation')
+    break
   #print(_wforce[0])
   #print(N_sample)
   
@@ -165,13 +178,17 @@ for i in range(0, numtsteps):
   # Calculate operators and add to average 
   if(_applynoise):
     N_avg += N_sample 
+    N2_avg += N2_sample 
     if(i % iointerval == 0): 
       _w_samples[ctr] = np.mean(_w) # integrate over tau 
       N_avg /= iointerval
+      N2_avg /= iointerval
       print('Completed ' + str(i) + ' steps. Particle number block avg = ' + str(N_avg) )
       Partnum_per_site_samples[ctr] = N_avg
+      N2_per_site_samples[ctr] = N2_avg
       # reset N_avg 
       N_avg = 0. + 1j*0. 
+      N2_avg = 0. + 1j*0. 
       ctr += 1
 
   # For mean-field, keep going until the tolerance is reached 
@@ -179,6 +196,7 @@ for i in range(0, numtsteps):
     if(i % iointerval == 0): 
       _w_samples[ctr] = np.mean(_w)
       Partnum_per_site_samples[ctr] = N_sample 
+      N2_per_site_samples[ctr] = N2_sample 
       ctr += 1
 
     if(np.max(_wforce).real < _MF_tol):
@@ -188,11 +206,14 @@ for i in range(0, numtsteps):
 
 
 thermal_avg_N = np.mean(Partnum_per_site_samples)
+thermal_avg_N2 = np.mean(N2_per_site_samples)
 thermal_avg_w = np.mean(_w_samples)
 
 if(_applynoise):
   print('Average particle number (real) : ' + str(thermal_avg_N.real) + '\n')
   print('Average particle number (imag) : ' + str(thermal_avg_N.imag) + '\n')
+  print('Average particle number sq (real) : ' + str(thermal_avg_N2.real) + '\n')
+  print('Average particle number sq (imag) : ' + str(thermal_avg_N2.imag) + '\n')
   print('Average _w imaginary value: ' + str(thermal_avg_w.imag) + '\n')
   print('Average _w real value: ' + str(thermal_avg_w.real) + '\n')
 
@@ -202,21 +223,37 @@ plt.style.use('~/CSBosonsCpp/tools/Figs_scripts/plot_style_orderparams.txt')
 
 if(_isPlotting):
   plt.figure(figsize=(6., 6.))
-  plt.plot(np.array(range(0, N_samples)) * float(iointerval), Partnum_per_site_samples.real, marker='o', color = 'k', markersize = 4, linewidth = 2., label = 'Re[N]')
-  plt.plot(np.array(range(0, N_samples)) * float(iointerval), Partnum_per_site_samples.imag, marker='x', color = 'r', markersize = 4, linewidth = 2., label = 'Im[N]')
+  plt.plot(np.array(range(0, Num_samples)) * float(iointerval), Partnum_per_site_samples.real, marker='o', color = 'k', markersize = 4, linewidth = 2., label = 'Re[N]')
+  plt.plot(np.array(range(0, Num_samples)) * float(iointerval), Partnum_per_site_samples.imag, marker='x', color = 'r', markersize = 4, linewidth = 2., label = 'Im[N]')
   if(_U == 0):
     plt.axhline(y = Nk_Bose(_beta, _mu), color = 'k', linestyle = 'dashed', label = r'Exact, Ideal gas ($N_{\tau} \to \infty$)') 
   else:
-    plt.axhline(y = 1.85, color = 'k', linestyle = 'dashed', label = r'Exact, Sum over states') 
+    plt.axhline(y = 1.84579, color = 'k', linestyle = 'dashed', label = r'Exact, Sum over states') 
   plt.title('$T = ' + str(_T) + '$, $\mu = $ ' + str(_mu) + ', $U = ' + str(_U) + '$',fontsize = 16)
   plt.xlabel('Iterations', fontsize = 28)
   plt.ylabel('$N$', fontsize = 28)
   plt.legend()
   plt.show()
 
+
   plt.figure(figsize=(6., 6.))
-  plt.plot(np.array(range(0, N_samples)) * float(iointerval), _w_samples.real, marker='o', color = 'k', markersize = 4, linewidth = 2., label = 'Re[w]')
-  plt.plot(np.array(range(0, N_samples)) * float(iointerval), _w_samples.imag, marker='p', color = 'b', markersize = 4, linewidth = 2., label = 'Im[w]')
+  plt.plot(np.array(range(0, Num_samples)) * float(iointerval), N2_per_site_samples.real, marker='o', color = 'k', markersize = 4, linewidth = 2., label = 'Re$[N^2]$')
+  plt.plot(np.array(range(0, Num_samples)) * float(iointerval), N2_per_site_samples.imag, marker='x', color = 'r', markersize = 4, linewidth = 2., label = 'Im$[N^2]$')
+  if(_U == 0):
+    plt.axhline(y = Nk_Bose(_beta, _mu) * Nk_Bose, color = 'k', linestyle = 'dashed', label = r'Exact, Ideal gas') 
+  else:
+    plt.axhline(y = 4.05073, color = 'k', linestyle = 'dashed', label = r'Exact, Sum over states') 
+  plt.title('$T = ' + str(_T) + '$, $\mu = $ ' + str(_mu) + ', $U = ' + str(_U) + '$',fontsize = 16)
+  plt.xlabel('Iterations', fontsize = 28)
+  plt.ylabel('$N^2$', fontsize = 28)
+  plt.legend()
+  plt.show()
+
+  plt.figure(figsize=(6., 6.))
+  plt.plot(np.array(range(0, Num_samples)) * float(iointerval), _w_samples.real, marker='o', color = 'k', markersize = 4, linewidth = 2., label = 'Re[w]')
+  plt.plot(np.array(range(0, Num_samples)) * float(iointerval), _w_samples.imag, marker='p', color = 'b', markersize = 4, linewidth = 2., label = 'Im[w]')
+  analytical_lim = _mu/_U + 0.5 
+  plt.axhline(y = analytical_lim, color = 'k', linestyle = 'dashed', label = r'analyiticity limit') 
   plt.xlabel('Iterations', fontsize = 28)
   plt.ylabel('$w$', fontsize = 28)
   plt.legend()
@@ -224,6 +261,7 @@ if(_isPlotting):
   
   plt.figure(figsize=(6., 6.))
   plt.plot(_w_samples.real, _w_samples.imag, marker='o', color = 'k', markersize = 4, linewidth = 2., label = 'Aux. Field Theory')
+  plt.axhline(y = analytical_lim, color = 'k', linestyle = 'dashed', label = r'analyiticity limit') 
   plt.xlabel('Re[$w$]', fontsize = 28)
   plt.ylabel('Im[$w$]', fontsize = 28)
   plt.legend()
