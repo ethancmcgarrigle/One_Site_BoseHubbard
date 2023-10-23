@@ -80,7 +80,7 @@ def calc_det_fxns(beta, ntau, mu, U, w_field):
   # nonlinear part  
   dS_dw += -N_operator * 1j * U * beta / ntau
 
-  k = 10
+  k = 60
   #k = 0
   # Add a penalty
   penalty = np.zeros(ntau, dtype=np.complex_) 
@@ -127,11 +127,12 @@ _w += (_mu/_U) + 0.5 + _shift
 _w *= 1j
 
 ## Numerics ## 
-_dt = 0.01
-numtsteps = int(1E6)
-#numtsteps = int(50000)
-iointerval = 2000
-#iointerval = 1
+_dt = 0.005
+#numtsteps = int(1E7)
+numtsteps = int(150000)
+#numtsteps = int(10000)
+iointerval = 1000
+#iointerval = 10
 _isEM = True
 #_mobility = 1.0
 _mobility = 1.0 * ntau 
