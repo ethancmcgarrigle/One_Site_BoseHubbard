@@ -16,7 +16,17 @@ def tstep_EM(_w, wforce, dt, mobility, applynoise):
   dV = 1. 
   scale = np.sqrt(2. * mobility * dt / dV) 
   #scale = np.sqrt(mobility * dt / Ntau ) 
-  noise_pcnt = 0.25
+  noise_pcnt = 1.00
+  #lim = 0.525
+  lim = 1.6 
+  for i, w in enumerate(_w): 
+    if( _w[i].imag < lim ):
+      _w[i] = -_w[i].real + 1j*(lim + (lim - _w[i].imag)) 
+      #_w[i] = -_w[i].real + 2j*(_w[i].imag - 1.6) 
+      #_w[i] += np.invert(_w[i].real) + 1 
+      #_w[i] += -2j*(_w[i].imag - 1.6) 
+  #print('Warning! Positivity condition violated')
+  #_w[i] = np.conj(_w[i]) 
 
   # Mean field or CL? 
   if(applynoise):
@@ -90,7 +100,7 @@ _U = 1.0
 _beta = 1.00
 _mu = 1.10
 #_mu = -0.10
-ntau = 100
+ntau = 1
 _T = 1./_beta
 print(' Temperature: ' + str(1./_beta))
 print(' Imaginary time discertization: ' + str(_beta / ntau) + '\n')
@@ -104,12 +114,12 @@ _wforce = np.zeros(ntau, dtype=np.complex_)
 
 # initialize w field 
 #_w += -(_mu) * 1j
-_shift = +4
+_shift = +5
 _w += (_mu/_U) + 0.5 + _shift 
 _w *= 1j
 
 ## Numerics ## 
-_dt = 0.005
+_dt = 0.01
 #numtsteps = int(1E6)
 numtsteps = int(90000)
 #numtsteps = int(2)

@@ -1,7 +1,7 @@
 system:
    U:        1.00
-   mu:       1.70
-   beta:     50.00
+   mu:       1.10
+   beta:     1.00
 
 numerics:
    N_terms:   50000

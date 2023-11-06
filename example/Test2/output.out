@@ -1,11 +1,11 @@
 Starting the program
-Computing sum with 20000 terms
+Computing sum with 50000 terms
 Constructing the driver
  - Repulsion strength U = 1
- - Chemical potential = 0.5
- - Temperature = 1
- Number of terms to compute in the sum: 20000
-The partition function: 2.89073
-The average internal energy  -0.142587
-The average particle number 1.52009
-The average squared-particle number 2.75501
+ - Chemical potential = 1.7
+ - Temperature = 0.02
+ Number of terms to compute in the sum: 50000
+The partition function: 1.30418e+52
+The average internal energy  -2.4
+The average particle number 2
+The average squared-particle number 4

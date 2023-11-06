@@ -8,11 +8,14 @@ import pdb
 
 
 # Code to run auxiliary field boson hubbard model for 1 site  
-def tstep_EM(_w, wforce, dt, mobility, applynoise):
+def tstep_EM(_w, wforce, dt, mobility, applynoise, _tau, tauforce):
   # Step
   Ntau = len(_w)
   #print(wforce[1])
-  _w -= (wforce * dt * mobility) # += op will modify _w as intended   
+  #_w -= (wforce * dt * mobility) * 3 * (_w**(2/3)) 
+  _w -= (wforce * dt * mobility) 
+  tau_mobility = 0.05
+  _tau -= (tauforce * dt * tau_mobility) # += op will modify _w as intended   
   dV = 1. 
   scale = np.sqrt(2. * mobility * dt / dV) 
   #scale = np.sqrt(mobility * dt / Ntau ) 
@@ -29,11 +32,17 @@ def tstep_EM(_w, wforce, dt, mobility, applynoise):
     #w_noise = np.random.normal(0., np.sqrt(2. * dt * _mobility), ntau) # real noise
     #w_noise = np.random.normal(0., np.sqrt(2. * dt * _mobility), Ntau) # real noise
     w_noise = np.zeros(len(_w), dtype=np.complex_)
-    w_noise += np.random.normal(0., 1., Ntau) # real noise
+    w_noise += np.random.normal(0., 1., Ntau) * 1j # imag noise
+    #w_noise += np.random.normal(0., 1., Ntau) # real noise
     w_noise *= scale * noise_pcnt 
     _w += w_noise
+    #_w += 3. * (_w**(2/3)) * w_noise * 1j 
+    #_w += 3. * (_w**(1/3)) * (w_noise**2)
+    #_w += 3. * (_w**(1/3)) * (w_noise * np.conj(w_noise)) 
+    _tau += np.random.normal(0., 1., 1) * noise_pcnt * np.sqrt(2. * tau_mobility * dt)
+    #_tau += 0. 
 
-  return _w
+  return _w, _tau
 
 
  #def tstep_ETD(_w, lincoef, nonlinforce, nonlinforce_coef, dt, mobility, applynoise):
@@ -60,14 +69,15 @@ def Nk_Bose(beta, mu):
   return 1./(np.exp(-beta * mu) - 1.)
 
 
-def calc_det_fxns(beta, ntau, mu, U, w_field):
+def calc_det_fxns(beta, ntau, mu, U, w_field, tau):
   # Matrix has PBC structure, so just fill a CSfield (vector for single site) of 
   # fill the vector  
-  offdiag_vec = np.zeros(ntau, dtype=np.complex_)
-  offdiag_vec += w_field
-  E_tot = beta * 1j * U * np.sum(offdiag_vec) / ntau
+  #E_tot = beta * 1j * U * np.sum(w_field**(1/2)) / ntau
+  E_tot = beta * U * np.sum(w_field) / ntau
+  #E_tot = beta * U * np.sum(w_field**(1/3)) / ntau
   E_tot += 0.5 * U * beta 
   E_tot += mu * beta
+  # want E_tot to be negative  
 
   exp_factor = np.exp(E_tot) # e^{-\Delta_{\tau} \sum_{j} E_{j} }
   det = 1. - exp_factor
@@ -79,40 +89,59 @@ def calc_det_fxns(beta, ntau, mu, U, w_field):
 
   # Linear part 
   dS_dw = np.zeros(ntau, dtype=np.complex_) 
-  dS_dw += w_field  
+  #dS_dw += w_field**(1/3) 
+  dS_dw += w_field 
   dS_dw *= U * beta / ntau
 
   # nonlinear part  
-  dS_dw += -N_operator * 1j * U * beta / ntau
+  dS_dw += N_operator * U * beta / ntau
+  #dS_dw += -N_operator * 1j * U * beta / ntau
 
-  k = 2500
-  #k = 0
+  # tau penalty 
+  dS_dw += (-1j * tau * U * beta)/ntau  
+  #dS_dw += (tau * 1j * 1j * U * beta)/ntau  
+
+  # tau force 
+  dS_dtau = 0. + 1j*0.  
+  dS_dtau += -1j*(E_tot)
+  #dS_dtau += -1j * (E_tot.real)
+ 
+  tau_eps = 0.01
+  #tau_eps = 0.0
+  dS_dtau += 1/(tau - 1j * tau_eps)
+
+
+  N_operator += -1j * tau
+
+
+  #k = 2500
+  k = 0
   # Add a penalty
-  penalty = np.zeros(ntau, dtype=np.complex_) 
-  penalty += -2 * k * 1j * beta * U / ntau
-  penalty /= (1. + np.exp(-2*k * E_tot.real)) 
-  shift = 0.0001
+  #penalty = np.zeros(ntau, dtype=np.complex_) 
+ #  penalty += -2 * k * 1j * beta * U / ntau
+ #  penalty /= (1. + np.exp(-2*k * E_tot.real)) 
+ #  shift = 0.0001
   #analytical_lim = mu/U + shift
   #analytical_lim = mu/U + 0.5 + shift
   #penalty /= (1. + np.exp(2*k * (np.sum(-w_field*1j)/ntau - analytical_lim) ))
   #print(np.mean(penalty))
-  dS_dw += penalty
+  #dS_dw += penalty
 
   #N_operator += (2*k) / (1. + np.exp(2*k * (np.sum(-w_field)*1j/ntau - analytical_lim) ) ) 
-  N_operator += (2*k) / (1. + np.exp(-2*k * E_tot.real))
+  #N_operator += (2*k) / (1. + np.exp(-2*k * E_tot.real))
 
   N_operator_sq = 0. + 1j*0.
   N_operator_sq = N_operator * N_operator
 
   # output 
-  return (dS_dw, N_operator, N_operator_sq)
+  return (dS_dw, dS_dtau, N_operator, N_operator_sq)
 
 
 ## System ## 
 _U = 1.0
 #_U = 0.0
-_beta = 50.00
-_mu = 1.50
+_beta = 1.00
+_mu = 1.10
 #_mu = -0.10
 ntau = 1
 _T = 1./_beta
@@ -129,19 +158,21 @@ _wforce = np.zeros(ntau, dtype=np.complex_)
 # initialize w field 
 #_w += -(_mu) * 1j
 _shift = +1.00
-_w += (_mu/_U) + 0.5 + _shift 
-_w *= 1j
+#_w += (_mu/_U) + 0.5 + _shift 
+#_w *= 0
 
 ## Numerics ## 
-_dt = 0.000001
+_dt = 0.0001
 #numtsteps = int(1E7)
-numtsteps = int(50000)
+#numtsteps = int(1E6)
+numtsteps = int(120000)
 #numtsteps = int(10000)
-iointerval = 500
+iointerval = 1000
 #iointerval = 2000
 #iointerval = 10
 _isEM = True
 #_mobility = 1.0
+#_mobility = 1.0 * ntau 
 _mobility = 1.0 * ntau 
 _applynoise = True
 _MF_tol = 1E-6
@@ -160,16 +191,20 @@ N2_per_site_samples = np.zeros(Num_samples, dtype=np.complex_)
 _w_samples = np.zeros(Num_samples, dtype=np.complex_) 
 ctr = 0
 
+_tau = 0. + 1j*0.
+_tau += -1j
+
 print('Starting simulation')
 # main loop 
 for i in range(0, numtsteps):
   # Calculate force, det, and N field operator 
   _wforce.fill(0.) 
+  _tauforce = 0.
   #detS, _wforce, N_operator += compute_w_force(_U, _mu, _beta, _w, ntau) 
 
   N_sample = 0. + 1j*0.
   N2_sample = 0. + 1j*0.
-  _wforce, N_sample, N2_sample = calc_det_fxns(_beta, ntau, _mu, _U, _w)
+  _wforce, _tauforce, N_sample, N2_sample = calc_det_fxns(_beta, ntau, _mu, _U, _w, _tau)
 
   if(np.isnan(N_sample)):
     print('Trajectory diverged. Particle number is nan, ending simulation')
@@ -180,7 +215,7 @@ for i in range(0, numtsteps):
   # step/propagate the field 
   #print('w before' + str(_w.real) + ' complex ' + str(_w.imag))
   if(_isEM):
-    _w = tstep_EM(_w, _wforce, _dt, _mobility, _applynoise)
+    _w, _tau = tstep_EM(_w, _wforce, _dt, _mobility, _applynoise, _tau, _tauforce)
   #print('w after ' + str(_w.real) + 'w complex ' + str(_w.imag))
 
   # Calculate operators and add to average 

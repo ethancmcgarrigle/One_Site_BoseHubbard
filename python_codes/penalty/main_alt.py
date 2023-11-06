@@ -65,7 +65,8 @@ def calc_det_fxns(beta, ntau, mu, U, w_field):
   # fill the vector  
   offdiag_vec = np.zeros(ntau, dtype=np.complex_)
   offdiag_vec += w_field
-  E_tot = beta * 1j * U * np.sum(offdiag_vec) / ntau
+  #E_tot = beta * 1j * U * np.sum(offdiag_vec) / ntau
+  E_tot = 1j * np.sum(offdiag_vec) / ntau
   E_tot += 0.5 * U * beta 
   E_tot += mu * beta
 
@@ -80,17 +81,21 @@ def calc_det_fxns(beta, ntau, mu, U, w_field):
   # Linear part 
   dS_dw = np.zeros(ntau, dtype=np.complex_) 
   dS_dw += w_field  
-  dS_dw *= U * beta / ntau
+  dS_dw /= (U * beta / ntau )
+  #dS_dw *= U * beta / ntau
 
   # nonlinear part  
-  dS_dw += -N_operator * 1j * U * beta / ntau
+  dS_dw += -N_operator * 1j / ntau
+  #dS_dw += -N_operator * 1j * U * beta / ntau
 
-  k = 2500
+  k = 500
   #k = 0
   # Add a penalty
   penalty = np.zeros(ntau, dtype=np.complex_) 
-  penalty += -2 * k * 1j * beta * U / ntau
+  #penalty += -2 * k * 1j * beta * U / ntau
+  penalty += -2 * k * 1j / ntau
   penalty /= (1. + np.exp(-2*k * E_tot.real)) 
+  #penalty /= (1. + np.exp(-2*k * np.abs(E_tot))) 
   shift = 0.0001
   #analytical_lim = mu/U + shift
   #analytical_lim = mu/U + 0.5 + shift
@@ -100,6 +105,7 @@ def calc_det_fxns(beta, ntau, mu, U, w_field):
 
   #N_operator += (2*k) / (1. + np.exp(2*k * (np.sum(-w_field)*1j/ntau - analytical_lim) ) ) 
   N_operator += (2*k) / (1. + np.exp(-2*k * E_tot.real))
+  #N_operator += (2*k) / (1. + np.exp(-2*k * np.abs(E_tot)))
 
   N_operator_sq = 0. + 1j*0.
   N_operator_sq = N_operator * N_operator
@@ -112,7 +118,7 @@ def calc_det_fxns(beta, ntau, mu, U, w_field):
 _U = 1.0
 #_U = 0.0
 _beta = 50.00
-_mu = 1.50
+_mu = 1.10
 #_mu = -0.10
 ntau = 1
 _T = 1./_beta
@@ -133,12 +139,12 @@ _w += (_mu/_U) + 0.5 + _shift
 _w *= 1j
 
 ## Numerics ## 
-_dt = 0.000001
+_dt = 0.001
 #numtsteps = int(1E7)
-numtsteps = int(50000)
+numtsteps = int(1E6)
 #numtsteps = int(10000)
-iointerval = 500
-#iointerval = 2000
+#iointerval = 1000
+iointerval = 2000
 #iointerval = 10
 _isEM = True
 #_mobility = 1.0
