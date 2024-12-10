@@ -1,0 +1,1 @@
+1. penalty of 0.01 worked very well with dt = 0.01. For mu, U, beta = 1.

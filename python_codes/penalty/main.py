@@ -16,7 +16,7 @@ def tstep_EM(_w, wforce, dt, mobility, applynoise):
   dV = 1. 
   scale = np.sqrt(2. * mobility * dt / dV) 
   #scale = np.sqrt(mobility * dt / Ntau ) 
-  noise_pcnt = 1.00
+  noise_pcnt = 1.0
 
  #  for i, w in enumerate(_w): 
  #    if( -1j*_w[i] < 1.6 ):
@@ -66,7 +66,7 @@ def calc_det_fxns(beta, ntau, mu, U, w_field):
   offdiag_vec = np.zeros(ntau, dtype=np.complex_)
   offdiag_vec += w_field
   E_tot = beta * 1j * U * np.sum(offdiag_vec) / ntau
-  E_tot += 0.5 * U * beta 
+  #E_tot += 0.5 * U * beta 
   E_tot += mu * beta
 
   exp_factor = np.exp(E_tot) # e^{-\Delta_{\tau} \sum_{j} E_{j} }
@@ -85,8 +85,8 @@ def calc_det_fxns(beta, ntau, mu, U, w_field):
   # nonlinear part  
   dS_dw += -N_operator * 1j * U * beta / ntau
 
-  k = 2500
-  #k = 0
+  #k = 1000
+  k = 0
   # Add a penalty
   penalty = np.zeros(ntau, dtype=np.complex_) 
   penalty += -2 * k * 1j * beta * U / ntau
@@ -109,12 +109,12 @@ def calc_det_fxns(beta, ntau, mu, U, w_field):
 
 
 ## System ## 
-_U = 1.0
+_U = 0.1
 #_U = 0.0
-_beta = 50.00
-_mu = 1.50
+_beta = 1.00
+_mu = 1.10
 #_mu = -0.10
-ntau = 1
+ntau = 64
 _T = 1./_beta
 print(' Temperature: ' + str(1./_beta))
 print(' Imaginary time discertization: ' + str(_beta / ntau) + '\n')
@@ -133,16 +133,16 @@ _w += (_mu/_U) + 0.5 + _shift
 _w *= 1j
 
 ## Numerics ## 
-_dt = 0.000001
+_dt = 0.001
 #numtsteps = int(1E7)
-numtsteps = int(50000)
+numtsteps = int(500000)
 #numtsteps = int(10000)
 iointerval = 500
 #iointerval = 2000
 #iointerval = 10
 _isEM = True
 #_mobility = 1.0
-_mobility = 1.0 * ntau 
+_mobility = 1.0 
 _applynoise = True
 _MF_tol = 1E-6
 
@@ -228,7 +228,7 @@ if(_applynoise):
 
 
 
-plt.style.use('~/CSBosonsCpp/tools/Figs_scripts/plot_style_orderparams.txt')
+plt.style.use('~/tools_csbosons/python_plot_styles/plot_style_data.txt')  
 
 if(_isPlotting):
   plt.figure(figsize=(6., 6.))
