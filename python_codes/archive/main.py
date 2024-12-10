@@ -16,6 +16,17 @@ def tstep_EM(_w, wforce, dt, mobility, applynoise):
   dV = 1. 
   scale = np.sqrt(2. * mobility * dt / dV) 
   #scale = np.sqrt(mobility * dt / Ntau ) 
+  noise_pcnt = 1.00
+  #lim = 0.525
+  lim = 1.6 
+  for i, w in enumerate(_w): 
+    if( _w[i].imag < lim ):
+      _w[i] = -_w[i].real + 1j*(lim + (lim - _w[i].imag)) 
+      #_w[i] = -_w[i].real + 2j*(_w[i].imag - 1.6) 
+      #_w[i] += np.invert(_w[i].real) + 1 
+      #_w[i] += -2j*(_w[i].imag - 1.6) 
+  #print('Warning! Positivity condition violated')
+  #_w[i] = np.conj(_w[i]) 
 
   # Mean field or CL? 
   if(applynoise):
@@ -24,7 +35,7 @@ def tstep_EM(_w, wforce, dt, mobility, applynoise):
     #w_noise = np.random.normal(0., np.sqrt(2. * dt * _mobility), Ntau) # real noise
     w_noise = np.zeros(len(_w), dtype=np.complex_)
     w_noise += np.random.normal(0., 1., Ntau) # real noise
-    w_noise *= scale / 6.0
+    w_noise *= scale * noise_pcnt 
     _w += w_noise
 
   return _w
@@ -84,12 +95,12 @@ def calc_det_fxns(beta, ntau, mu, U, w_field):
 
 
 ## System ## 
-_U = 10.0
+_U = 1.0
 #_U = 0.0
 _beta = 1.00
 _mu = 1.10
 #_mu = -0.10
-ntau = 40
+ntau = 1
 _T = 1./_beta
 print(' Temperature: ' + str(1./_beta))
 print(' Imaginary time discertization: ' + str(_beta / ntau) + '\n')
@@ -103,14 +114,14 @@ _wforce = np.zeros(ntau, dtype=np.complex_)
 
 # initialize w field 
 #_w += -(_mu) * 1j
-_shift = +10
+_shift = +5
 _w += (_mu/_U) + 0.5 + _shift 
 _w *= 1j
 
 ## Numerics ## 
-_dt = 0.001
+_dt = 0.01
 #numtsteps = int(1E6)
-numtsteps = int(20000)
+numtsteps = int(90000)
 #numtsteps = int(2)
 #numtsteps = int(100)
 iointerval = 100
