@@ -196,9 +196,9 @@ def calc_ops_and_forces(beta, ntau, mu, U, w_field):
 if __name__ == "__main__":
   ''' Script to run a CL simulation of the single-site Bose Hubbard model in the auxiliary variable representation'''
   ## System ## 
-  _U = 2.0
+  _U = 1.00
   _beta = 1.0
-  _mu = 1.0
+  _mu = 1.25
   ntau = 1     # keep at 1 
   _T = 1./_beta
   print(' Temperature: ' + str(1./_beta))
@@ -243,6 +243,7 @@ if __name__ == "__main__":
   N_avg = 0. + 1j*0.
   N2_avg = 0. + 1j*0.
   U_avg = 0. + 1j*0.
+  U2_avg = 0. + 1j*0.
   w_avg = 0. + 1j*0.
   v_avg = 0. + 1j*0.
   dt_avg = 0. 
@@ -250,6 +251,7 @@ if __name__ == "__main__":
   N_samples = int(numtsteps/iointerval)
   Partnum_per_site_samples = np.zeros(N_samples, dtype=np.complex_) 
   N2_samples = np.zeros(N_samples, dtype=np.complex_) 
+  U2_samples = np.zeros(N_samples, dtype=np.complex_) 
   U_samples = np.zeros(N_samples, dtype=np.complex_) 
   _w_samples = np.zeros(N_samples, dtype=np.complex_) 
   _v_samples = np.zeros(N_samples, dtype=np.complex_) 
@@ -291,6 +293,7 @@ if __name__ == "__main__":
       N_avg += N_sample
       N2_avg += (N_sample**2.)
       U_avg += U_sample
+      U2_avg += U_sample**2.
       w_avg += _w[0] 
       v_avg += _v[0] 
       dt_avg += _dt
@@ -301,11 +304,13 @@ if __name__ == "__main__":
         _v_samples[ctr] = v_avg/iointerval 
         N_avg /= iointerval
         N2_avg /= iointerval
+        U2_avg /= iointerval
         U_avg /= iointerval
         print('Completed ' + str(i) + ' steps. Particle number block avg = ' + str(N_avg) )
         Partnum_per_site_samples[ctr] = N_avg
         N2_samples[ctr] = N2_avg
         U_samples[ctr] = U_avg
+        U2_samples[ctr] = U2_avg
         # reset N_avg 
         N_avg = 0. + 1j*0. 
         U_avg = 0. + 1j*0. 
@@ -340,6 +345,7 @@ if __name__ == "__main__":
     #print('Average _w imaginary value: ' + str(thermal_avg_w.imag) + '\n')
     #print('Average _w real value: ' + str(thermal_avg_w.real) + '\n')
     print('Average internal energy (real) : ' + str(np.mean(U_samples).real) + '\n')
+    print('Average internal energy squared (real) : ' + str(np.mean(U2_samples).real) + '\n')
     #print('Average interal energy (imag) : ' + str(np.mean(U_samples).imag) + '\n')
   
   
