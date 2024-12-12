@@ -7,166 +7,22 @@ import matplotlib.pyplot as plt
 import pdb
 from single_site_BH_reference import *
 
+from main import *
 
 
-def select_dt(dt, wforce, Kref):
-  p = 2
-  upper_bound = Kref*p
-  lower_bound = Kref/p
-  #lower_bound = Kref/1000.
-
-  force_modulus = np.abs(wforce)
-  if(force_modulus * dt > upper_bound): 
-    dt = upper_bound / force_modulus 
-
-  if(force_modulus * dt < lower_bound):
-    dt = lower_bound / force_modulus 
-
-  # Absolute upper bound 
-  if(dt > 0.1):
-    dt = 0.001 # set to a nominal value 
-
-  return dt  
+def N_w_op_modified(beta, mu, U, w):
+  E_tot = beta * (mu + U*0.5 - 1j*np.sqrt(U / beta)*w) 
+  # Calc N_operator  
+  N_tmp = 0. + 1j*0.
+  N_tmp = np.exp(E_tot) / (1. - np.exp(E_tot)).real 
+  return N_tmp
 
 
 
-def select_dt_option2(dt, wforce, Kref):
-  ''' Another option for adaptive time stepping .
-      if dt > 2 / |F|^2 , then replace 
-          dt --> dt = 2 / |F|^2
-      Can choose a constant of proportionality too, e.g.
-        dt = 2 * Kref / |F|^2 ''' 
-
-  force_modulus = np.abs(wforce)
-  upper_bound = 2. / force_modulus 
-  if(0.5*dt > (2. / (force_modulus**2.))):
-    dt = 2. / (force_modulus**2.) 
-
-  # Absolute upper bound 
-  if(dt > 0.1):
-    dt = 0.001 # set to a nominal value 
-
-  return dt  
-
-
-def Gaussian_force(w, w_max, var, amplitude = 1.):
-  eps = 1e-12
-  force = np.zeros_like(w, dtype=np.complex_)
-  force = -0.5 * (w.imag - w_max + eps)**2. / (var**2.)
-  force = -np.exp(force) * 1j / (np.sqrt(2.*np.pi) * var ) # should be negative and purely imaginary 
-  return force*amplitude 
-
-
-def smeared_delta(w, w_max, var, amplitude = 1.):
-  eps = 1e-12
-  force = np.zeros_like(w, dtype=np.complex_)
-  force = (w.imag - w_max + eps)**2. 
-  force += var**2
-  force = 1./force
-  force *= -1.*var/np.pi
-  return force*amplitude*1j 
-
-
-
-# Code to run auxiliary field boson hubbard model for 1 site  
-def tstep_EM(_w, wforce, dt, mobility, applynoise, enforce_limit=False):
-  # Euler Maruyama Step
-  Ntau = len(_w)
-  _wref = np.zeros_like(_w)
-  _wref += _w
-  _w -= (wforce * dt * mobility) 
-
-  # need to check if Im[w] > limit or getting too close, Im[w] < limit must be enforced  
-  eps = 1E-16
-  #while((_w.imag - limit) > -eps):
-  if(enforce_limit):
-    while((_w.imag - limit) > 0.):
-      print('Im[w] has violated the constraint. Lowering the timestep. ')
-      # Return w back to its original configuration and lower the step 
-      #dt = dt*0.25
-      _w.fill(0.)
-      _w += _wref
-      # Option 2: determine dt such that Im[w] doesn't pass the boundary  
-      # Im[w](l+1) = Im[w](l) - dt*Im[force]*mobility
-        # (limit - eps) = Im[w](l) - dt*Im[force]*mobility
-        # therefore, dt = (limit - eps - Im[w])/(-Im[force] * mobility) 
-      dt = (limit - eps - _w.imag)/(-wforce.imag * mobility)
-      _w -= (wforce * dt * mobility) 
-
-
-  dV = 1. 
-  scale = np.sqrt(2. * mobility * dt / dV) 
-  noise_pcnt = 1.00
-
-  # Mean field or CL? 
-  if(applynoise):
-    # Generate noise 
-    w_noise = np.zeros(len(_w), dtype=np.complex_)
-    w_noise += np.random.normal(0., 1., Ntau) # real noise
-    w_noise *= scale * noise_pcnt 
-    _w += w_noise
-
-  return _w, dt
-
-
-def project_w(_w, _v, _beta, _mu, _U, dt):
-  #eps = 1E-12
-  eps = 0.0001
-  # Evaluate h[w]
-  h_w = 0. # real 
-  h_w = _w.imag + (_beta * (_U*0.5 + _mu) / np.sqrt(_beta * _U))
-
-  if(h_w < 0.):
-    _v.fill(0.)
-    _print_imaginary = False
-  else:
-    _print_imaginary = False
-    # h(w) => 0. represent divergent contributions  
-    # Choice 1: send w back to the boundary + an epsilon 
-    _v = (2. /  dt) * (eps + h_w) 
-    #_v = (-0.1 /  dt) * (eps + h_w) 
-    # Choice 2: Reflect across the boundary  
-    _v *= 2.
-    # Choice 3: delta-function force (hard-wall) 
-    
-  # Project w
-  _w -= _v * 1j * 0.5 * dt
-  #_w += _v * 1j * 0.5 * dt 
-
-  if(_print_imaginary):
-    print('Performing projection')
-    print('Imaginary part of w from inequality projection')
-    print(_w.imag)
-
-  return _w, _v
-
-
- #def tstep_ETD(_w, lincoef, nonlinforce, nonlinforce_coef, dt, mobility, applynoise):
- #  # Step
- #  _w *= lincoef # e^{-dt * mobility * beta U / ntau)
- #  _w += (-wforce * nonlinforce_coef) # += op will modify _w as intended   
- #
- #  dV = 1.
- #  scale = np.sqrt(2. * mobility * dt / dV)
- #  # Mean field or CL? 
- #  Ntau = len(_w)
- #  if(applynoise):
- #    # Generate noise 
- #    #w_noise = np.random.normal(0., np.sqrt(2. * dt * _mobility), ntau) # real noise
- #    #w_noise = np.random.normal(0., np.sqrt(2. * dt * _mobility), Ntau) # real noise
- #    w_noise = np.random.normal(0., 1., Ntau) # real noise
- #    w_noise *= scale
- #    _w += w_noise
- #
- #  return _w
- #
-
-def Nk_Bose(beta, mu):
-  return 1./(np.exp(-beta * mu) - 1.)
-
-
-def calc_ops_and_forces(beta, ntau, mu, U, w_field):
+def calc_ops_and_forces_quenched(beta, ntau, mu, U, w_field):
   ''' Calculates and outputs N[w], U[w], and dS/dw '''
+  ''' Phase quenched model, S = w^2/2 + Re[ln[1 - exp(..)]] ''' 
+  
   # Calc N_operator  
   N_tmp = N_w_op(beta, mu, U, w_field)
   U_tmp = internal_energy_w_op(beta, mu, U, w_field)
@@ -180,15 +36,13 @@ def calc_ops_and_forces(beta, ntau, mu, U, w_field):
   #dS_dw += N_tmp * 1j * np.sqrt(U * beta / ntau)
 
   _penalty_strength = 1.00
-  #_penalty_width = 0.001    # 0.01 worked really well with dt = 0.01 ; penalty = 0.1 was biased 
-  _penalty_width = 0.001    # 0.01 worked really well with dt = 0.01 ; penalty = 0.1 was biased 
-  #_penalty_width = 0.005    # 0.01 worked really well with dt = 0.01 ; penalty = 0.1 was biased 
-  dS_dw -= (1./np.sqrt(beta*U)) * np.pi * smeared_delta(_w, limit, _penalty_width, _penalty_strength)
-
-  #dS_dw -= (np.sqrt(beta/U)**(-1.)) * np.pi * smeared_delta(_w, limit, _penalty_width, _penalty_strength)
-  #dS_dw -= (np.sqrt(beta/U)**(-1.)) * np.pi * Gaussian_force(_w, limit, _penalty_width, _penalty_strength)
-  #dS_dw -= (np.sqrt(beta * U)**-1.) * np.pi * Gaussian_force(_w, limit, _penalty_width, _penalty_strength)
+  #_penalty_width = 0.005     # 0.01 worked really well with dt = 0.01 ; penalty = 0.1 was biased 
+  #_penalty_width = 0.01     # 0.01 worked really well with dt = 0.01 ; penalty = 0.1 was biased 
+  _penalty_width = 0.000045    # 0.01 worked really well with dt = 0.01 ; penalty = 0.1 was biased 
+  dS_dw -= smeared_delta(_w, limit, _penalty_width, _penalty_strength)
+  #dS_dw -= Gaussian_force(_w, limit, _penalty_width, _penalty_strength)
   return (dS_dw, N_tmp, U_tmp)
+
 
 
 
@@ -196,7 +50,7 @@ def calc_ops_and_forces(beta, ntau, mu, U, w_field):
 if __name__ == "__main__":
   ''' Script to run a CL simulation of the single-site Bose Hubbard model in the auxiliary variable representation'''
   ## System ## 
-  _U = 2.0
+  _U = 1.00
   _beta = 1.0
   _mu = 1.0
   ntau = 1     # keep at 1 
@@ -222,16 +76,13 @@ if __name__ == "__main__":
   _w += -_shift # extra shift for conservative starting point 
   _w *= 1j 
   
-  
-  
   ## Numerics ## 
-  _dt = 0.001
+  _dt = 0.005
   _dt_nominal = _dt
-  numtsteps = int(500000)
+  numtsteps = int(100000)
   iointerval = 1000
   _isEM = True
-  #_mobility = 1./(np.sqrt(_beta * _U)) * ntau 
-  _mobility = (np.sqrt(_beta * _U)) * ntau 
+  _mobility = 1./(np.sqrt(_beta * _U)) * ntau 
   _applynoise = True
   _MF_tol = 1E-6
   
@@ -262,7 +113,6 @@ if __name__ == "__main__":
   
   
   _Kref = 1E-2
-  #_Kref = 2E-3
   print('Starting simulation')
   adaptive_timestepping = True
   
@@ -273,7 +123,8 @@ if __name__ == "__main__":
     _wforce.fill(0.) 
   
     N_sample = 0. + 1j*0.
-    _wforce, N_sample, U_sample =  calc_ops_and_forces(_beta, ntau, _mu, _U, _w)
+    #_wforce, N_sample, U_sample =  calc_ops_and_forces(_beta, ntau, _mu, _U, _w)
+    _wforce, N_sample, U_sample = calc_ops_and_forces_quenched(_beta, ntau, _mu, _U, _w)
   
     if(adaptive_timestepping):
       _dt = select_dt(_dt, _wforce, _Kref)
@@ -329,7 +180,7 @@ if __name__ == "__main__":
   
   
   thermal_avg_N = np.mean(Partnum_per_site_samples)
-  thermal_avg_N2 = np.mean(N2_samples)
+  thermal_avg_N2 = np.mean(N2_samples.real)
   thermal_avg_w = np.mean(_w_samples)
   
   if(_applynoise):
@@ -344,7 +195,7 @@ if __name__ == "__main__":
   
   
   # Calculate and disdplay the exact reference 
-  N_exact, U_exact = generate_reference(_beta, _mu, _U, 5000, True)
+  N_exact, U_exact = generate_reference(_beta, _mu, _U, 500, True)
   print('Contour integration references')
   N_contour_wrong, U_contour_wrong = contour_integration_ref(_beta, _mu, _U, 0., False)
   N_contour_correct, U_contour_correct = contour_integration_ref(_beta, _mu, _U, 1j*(limit - 0.25), False)

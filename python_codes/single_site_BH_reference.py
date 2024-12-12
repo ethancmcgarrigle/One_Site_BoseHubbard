@@ -44,12 +44,12 @@ def calculate_U_avg(beta, mu, U, Z, N_terms, calc_U_squared):
     return results
 
 
-def display_averages(N_ops, U_ops):
+def display_averages(N_ops, U_ops, method_str = 'sum over states'):
   ''' Each argument is a list of the operators '''   
   N_op = N_ops[0]
   U_op = U_ops[0]
   print()
-  print('Single site Bose Hubbard model, sum over states reference results\n')
+  print('Single site Bose Hubbard model, ' + method_str + ' reference results\n')
   print('Average particle number : ' + str(N_op) + '\n')
   print('Average internal energy : ' + str(U_op) + '\n')
  
@@ -99,13 +99,18 @@ def internal_energy_w_op(beta, mu, U, w):
 
 
 
-def contour_integration_ref(beta, mu, U, w_imag_ref, calcSquared_ops = False):
+def contour_integration_ref(beta, mu, U, w_imag_ref, calcSquared_ops = False, display_results = False):
    ''' Function to perform contour integration for an additional reference ''' 
    #print('Single site Bose Hubbard model, contour integration reference results\n')
    # Make the contour: 
-   w_real_max = 250.
+   if(beta * U > 1.):
+     w_real_max = 250. * beta * U 
+     w = np.linspace(-w_real_max, w_real_max, 50000 * int(beta * U), dtype=np.complex_)
+   else:
+     w_real_max = 250. 
+     w = np.linspace(-w_real_max, w_real_max, 50000, dtype=np.complex_)
+
    # Real part of w 
-   w = np.linspace(-w_real_max, w_real_max, 50000, dtype=np.complex_)
 
    # Integrate the w contour with constant imaginary part: 
    w += w_imag_ref*np.ones_like(w, dtype=np.complex_)
@@ -121,6 +126,8 @@ def contour_integration_ref(beta, mu, U, w_imag_ref, calcSquared_ops = False):
 
    N_avg = np.trapz(y = weights*N_w, x = w)/Z   
    U_avg = np.trapz(y = weights*U_w, x = w)/Z   
+   if(display_results):
+     display_averages([N_avg.real], [U_avg.real], 'contour integration')  
    return N_avg, U_avg
 
 
@@ -140,7 +147,7 @@ if __name__ == "__main__":
      average interal energy (U) 
   '''
   _beta = 1.00
-  _mu = 1.00
+  _mu = 1.0
   _U = 1.00
 
   limit = -_beta * (_mu + 0.5*_U) / np.sqrt(_beta * _U) 
