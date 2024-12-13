@@ -6,7 +6,8 @@ matplotlib.use('Tkagg')
 import matplotlib.pyplot as plt 
 import pdb
 from single_site_BH_reference import *
-
+from mpmath import *
+mp.pretty = True
 
 
 def select_dt(dt, wforce, Kref):
@@ -109,6 +110,34 @@ def tstep_EM(_w, wforce, dt, mobility, applynoise, enforce_limit=False):
   return _w, dt
 
 
+def tstep_ETD(_w, wforce, dt, mobility, applynoise, enforce_limit=False):
+  ''' ETD timestepper for w field'''
+  ''' wforce = w + nonlinear-terms'''
+  # Separate nonlinear force 
+  nonlinforce = wforce - _w 
+
+  # linear coefficient is 1. 
+  linear_coef = np.exp(-dt*mobility*np.ones(len(_w)))
+  
+  # nonlinear t-step coefficient
+  nonlin_coef = -(1. - linear_coef)/1. 
+
+  # noisescl coefficient 
+  noisescl = np.sqrt((1. - linear_coef*linear_coef)/1.) 
+
+  # Step
+  _w *= linear_coef # e^{-dt * mobility * beta U / ntau)
+  _w += (nonlinforce * nonlin_coef) 
+
+  if(applynoise):
+    # Generate noise 
+    w_noise = np.random.normal(0., 1., len(_w)) # real noise
+    w_noise *= noisescl 
+    _w += w_noise
+
+  return _w, dt
+
+
 def project_w(_w, _v, _beta, _mu, _U, dt):
   #eps = 1E-12
   eps = 0.0001
@@ -141,25 +170,7 @@ def project_w(_w, _v, _beta, _mu, _U, dt):
   return _w, _v
 
 
- #def tstep_ETD(_w, lincoef, nonlinforce, nonlinforce_coef, dt, mobility, applynoise):
- #  # Step
- #  _w *= lincoef # e^{-dt * mobility * beta U / ntau)
- #  _w += (-wforce * nonlinforce_coef) # += op will modify _w as intended   
- #
- #  dV = 1.
- #  scale = np.sqrt(2. * mobility * dt / dV)
- #  # Mean field or CL? 
- #  Ntau = len(_w)
- #  if(applynoise):
- #    # Generate noise 
- #    #w_noise = np.random.normal(0., np.sqrt(2. * dt * _mobility), ntau) # real noise
- #    #w_noise = np.random.normal(0., np.sqrt(2. * dt * _mobility), Ntau) # real noise
- #    w_noise = np.random.normal(0., 1., Ntau) # real noise
- #    w_noise *= scale
- #    _w += w_noise
- #
- #  return _w
- #
+
 
 def Nk_Bose(beta, mu):
   return 1./(np.exp(-beta * mu) - 1.)
@@ -180,9 +191,7 @@ def calc_ops_and_forces(beta, ntau, mu, U, w_field):
   #dS_dw += N_tmp * 1j * np.sqrt(U * beta / ntau)
 
   _penalty_strength = 1.00
-  #_penalty_width = 0.001    # 0.01 worked really well with dt = 0.01 ; penalty = 0.1 was biased 
-  _penalty_width = 0.001    # 0.01 worked really well with dt = 0.01 ; penalty = 0.1 was biased 
-  #_penalty_width = 0.005    # 0.01 worked really well with dt = 0.01 ; penalty = 0.1 was biased 
+  _penalty_width = 0.001    
   dS_dw -= (1./np.sqrt(beta*U)) * np.pi * smeared_delta(_w, limit, _penalty_width, _penalty_strength)
 
   #dS_dw -= (np.sqrt(beta/U)**(-1.)) * np.pi * smeared_delta(_w, limit, _penalty_width, _penalty_strength)
@@ -196,9 +205,9 @@ def calc_ops_and_forces(beta, ntau, mu, U, w_field):
 if __name__ == "__main__":
   ''' Script to run a CL simulation of the single-site Bose Hubbard model in the auxiliary variable representation'''
   ## System ## 
-  _U = 1.00
+  _U = 0.90
   _beta = 1.0
-  _mu = 1.25
+  _mu = 1.33
   ntau = 1     # keep at 1 
   _T = 1./_beta
   print(' Temperature: ' + str(1./_beta))
@@ -226,10 +235,11 @@ if __name__ == "__main__":
   
   ## Numerics ## 
   _dt = 0.001
+  #_dt = 0.01
   _dt_nominal = _dt
   numtsteps = int(500000)
   iointerval = 1000
-  _isEM = True
+  _isEM = False
   #_mobility = 1./(np.sqrt(_beta * _U)) * ntau 
   _mobility = (np.sqrt(_beta * _U)) * ntau 
   _applynoise = True
@@ -247,6 +257,7 @@ if __name__ == "__main__":
   w_avg = 0. + 1j*0.
   v_avg = 0. + 1j*0.
   dt_avg = 0. 
+  log_arg_avg = 0. 
   assert((numtsteps/iointerval).is_integer())
   N_samples = int(numtsteps/iointerval)
   Partnum_per_site_samples = np.zeros(N_samples, dtype=np.complex_) 
@@ -256,9 +267,11 @@ if __name__ == "__main__":
   _w_samples = np.zeros(N_samples, dtype=np.complex_) 
   _v_samples = np.zeros(N_samples, dtype=np.complex_) 
   _dt_samples = np.zeros(N_samples, dtype=np.complex_) 
+  _log_arg_samples = np.zeros(N_samples, dtype=np.complex_) 
   _w_samples[0] += _w
   _v_samples[0] += _v
   _dt_samples[0] = _dt_nominal 
+  _log_arg_samples[0] = 1. - np.exp(_beta*_mu + _beta*_U*0.5 - 1j*_w[0]*np.sqrt(_beta*_U))
   U_samples[0] = U_avg
   ctr = 0
   
@@ -270,7 +283,7 @@ if __name__ == "__main__":
   
   
   # main loop 
-  for i in range(numtsteps):
+  for i in range(1, numtsteps+1):
     # Calculate force, det, and N field operator 
     _wforce.fill(0.) 
   
@@ -284,6 +297,8 @@ if __name__ == "__main__":
     # step/propagate the field 
     if(_isEM):
       _w, _dt = tstep_EM(_w, _wforce, _dt, _mobility, _applynoise, False)
+    else:
+      _w, _dt = tstep_ETD(_w, _wforce, _dt, _mobility, _applynoise, False)
     
     # project _w s.t. the inequality constraint is obeyed: h<0
     #_w, _v = project_w(_w, _v, _beta, _mu, _U, _dt)
@@ -297,11 +312,13 @@ if __name__ == "__main__":
       w_avg += _w[0] 
       v_avg += _v[0] 
       dt_avg += _dt
+      log_arg_avg += 1. - np.exp(_beta*_mu + _beta*_U*0.5 - 1j*_w[0]*np.sqrt(_beta*_U))
   
       if(i % iointerval == 0): 
         _dt_samples[ctr] = dt_avg/iointerval
         _w_samples[ctr] = w_avg/iointerval 
         _v_samples[ctr] = v_avg/iointerval 
+        _log_arg_samples[ctr] = log_arg_avg/iointerval 
         N_avg /= iointerval
         N2_avg /= iointerval
         U2_avg /= iointerval
@@ -318,6 +335,7 @@ if __name__ == "__main__":
         w_avg = 0. + 1j*0. 
         v_avg = 0. + 1j*0. 
         dt_avg = 0. 
+        log_arg_avg = 0. 
         ctr += 1
   
     # For mean-field, keep going until the tolerance is reached 
@@ -396,6 +414,24 @@ if __name__ == "__main__":
       plt.ylabel('$\Delta t$', fontsize = 28)
       plt.legend()
       plt.show()
+
+ #    plt.figure(figsize=(6., 6.))
+ #    plt.plot(np.array(range(0, N_samples)) * float(iointerval), _log_arg_samples, marker='o', color = 'k', markersize = 4, linewidth = 2., label = 'arg[z]')
+ #    #plt.axvline(x = 0., color = 'k', linestyle = 'dashed', label = r'Nominal') 
+ #    plt.title('$T = ' + str(_T) + '$, $\mu = $ ' + str(_mu) + ', $U = ' + str(_U) + '$',fontsize = 16)
+ #    plt.xlabel('CL Iterations', fontsize = 28)
+ #    plt.ylabel('Argument', fontsize = 28)
+ #    plt.legend()
+ #    plt.show()
+
+    plt.figure(figsize=(6., 6.))
+    plt.plot(_log_arg_samples.real, _log_arg_samples.imag, marker='o', color = 'k', markersize = 4, linewidth = 2., label = 'z')
+    plt.axvline(x = 0., color = 'k', linestyle = 'dashed', label = r'x = 0') 
+    plt.title('$T = ' + str(_T) + '$, $\mu = $ ' + str(_mu) + ', $U = ' + str(_U) + '$',fontsize = 16)
+    plt.xlabel('Re[z]', fontsize = 28)
+    plt.ylabel('Im[z]', fontsize = 28)
+    plt.legend()
+    plt.show()
   
     plt.figure(figsize=(6., 6.))
     plt.plot(np.array(range(0, N_samples)) * float(iointerval), _w_samples.real, marker='o', color = 'k', markersize = 4, linewidth = 2., label = 'Re[w]')
