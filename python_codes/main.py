@@ -68,6 +68,15 @@ def smeared_delta(w, w_max, var, amplitude = 1.):
   return force*amplitude*1j 
 
 
+def lorentzian(w, w_max, var, amplitude = 1.):
+  eps = 1e-12
+  force = np.zeros_like(w, dtype=np.complex_)
+  force = 2.*(w.imag - w_max + eps)**2. 
+  force += 0.5*var**2
+  force = 1./force
+  force *= -1.*var/np.pi
+  return force*amplitude*1j 
+
 
 # Code to run auxiliary field boson hubbard model for 1 site  
 def tstep_EM(_w, wforce, dt, mobility, applynoise, enforce_limit=False):
@@ -176,7 +185,7 @@ def Nk_Bose(beta, mu):
   return 1./(np.exp(-beta * mu) - 1.)
 
 
-def calc_ops_and_forces(beta, ntau, mu, U, w_field):
+def calc_ops_and_forces(beta, ntau, mu, U, w_field, dt_scale = 1.):
   ''' Calculates and outputs N[w], U[w], and dS/dw '''
   # Calc N_operator  
   N_tmp = N_w_op(beta, mu, U, w_field)
@@ -191,8 +200,11 @@ def calc_ops_and_forces(beta, ntau, mu, U, w_field):
   #dS_dw += N_tmp * 1j * np.sqrt(U * beta / ntau)
 
   _penalty_strength = 1.00
-  _penalty_width = 0.001    
+  _penalty_width = 0.001   # good for mu/U ~ 1 
+  #_penalty_width = 0.0005    # good for mu/U >> 1
   dS_dw -= (1./np.sqrt(beta*U)) * np.pi * smeared_delta(_w, limit, _penalty_width, _penalty_strength)
+
+  #dS_dw -= (1./np.sqrt(beta*U)) * np.pi * lorentzian(_w, limit, _penalty_width, _penalty_strength)
 
   #dS_dw -= (np.sqrt(beta/U)**(-1.)) * np.pi * smeared_delta(_w, limit, _penalty_width, _penalty_strength)
   #dS_dw -= (np.sqrt(beta/U)**(-1.)) * np.pi * Gaussian_force(_w, limit, _penalty_width, _penalty_strength)
@@ -200,16 +212,41 @@ def calc_ops_and_forces(beta, ntau, mu, U, w_field):
   return (dS_dw, N_tmp, U_tmp)
 
 
+def return_saddle_pt(beta, mu, U, w_init):
+  '''Returns the physical saddle point of the w theory''' 
+  cost = 1.
+  tol = 1E-7 # iteration tolerance 
+  w_tmp = 0. 
+  w_tmp += w_init
+  alpha = 1E-2 # relaxation parameter
+  ctr = 1
+  while(cost > tol):
+    tmp_force, _, _ = calc_ops_and_forces(beta, len(w_init), mu, U, w_tmp)
+    w_tmp -= tmp_force*alpha 
+    cost = np.abs(tmp_force)
+    if(cost < tol):
+      print('Converged to a saddle point in ' + str(ctr) + ' iterations.')
+      return w_tmp
+
+    ctr += 1
+    if ctr > 1000:
+      print('We have exceeded the max number of iterations. Quitting') 
+      return 0. 
+     
+  return w_tmp 
+
+
 
 
 if __name__ == "__main__":
   ''' Script to run a CL simulation of the single-site Bose Hubbard model in the auxiliary variable representation'''
   ## System ## 
-  _U = 0.90
+  _U = 1.00
   _beta = 1.0
-  _mu = 1.33
+  _mu = 1.1
   ntau = 1     # keep at 1 
   _T = 1./_beta
+
   print(' Temperature: ' + str(1./_beta))
   print(' Imaginary time discertization: ' + str(_beta / ntau) + '\n')
   
@@ -230,7 +267,10 @@ if __name__ == "__main__":
   _w += limit 
   _w += -_shift # extra shift for conservative starting point 
   _w *= 1j 
-  
+
+  w_saddle = return_saddle_pt(_beta, _mu, _U, _w)
+  print('Saddle point : ' + str(w_saddle))
+  print('N operator at the saddle point : ' + str(N_w_op(_beta, _mu, _U, w_saddle)))
   
   
   ## Numerics ## 
@@ -240,8 +280,12 @@ if __name__ == "__main__":
   numtsteps = int(500000)
   iointerval = 1000
   _isEM = False
-  #_mobility = 1./(np.sqrt(_beta * _U)) * ntau 
-  _mobility = (np.sqrt(_beta * _U)) * ntau 
+  if((_beta * _U) > 1.):
+    _mobility = 1./(_beta * _U) * ntau 
+    #_mobility = 1./np.sqrt(_beta * _U) * ntau 
+  else:
+    _mobility = (np.sqrt(_beta * _U)) * ntau 
+
   _applynoise = True
   _MF_tol = 1E-6
   
@@ -277,10 +321,9 @@ if __name__ == "__main__":
   
   
   _Kref = 1E-2
-  #_Kref = 2E-3
+  #_Kref = 5E-4
   print('Starting simulation')
   adaptive_timestepping = True
-  
   
   # main loop 
   for i in range(1, numtsteps+1):
@@ -288,10 +331,11 @@ if __name__ == "__main__":
     _wforce.fill(0.) 
   
     N_sample = 0. + 1j*0.
-    _wforce, N_sample, U_sample =  calc_ops_and_forces(_beta, ntau, _mu, _U, _w)
+    _wforce, N_sample, U_sample =  calc_ops_and_forces(_beta, ntau, _mu, _U, _w, _dt)
   
     if(adaptive_timestepping):
       _dt = select_dt(_dt, _wforce, _Kref)
+      #_wforce, N_sample, U_sample =  calc_ops_and_forces(_beta, ntau, _mu, _U, _w, _dt)
       #_dt = select_dt_option2(_dt, _wforce, _Kref)
     
     # step/propagate the field 
@@ -437,6 +481,7 @@ if __name__ == "__main__":
     plt.plot(np.array(range(0, N_samples)) * float(iointerval), _w_samples.real, marker='o', color = 'k', markersize = 4, linewidth = 2., label = 'Re[w]')
     plt.plot(np.array(range(0, N_samples)) * float(iointerval), _w_samples.imag, marker='p', color = 'b', markersize = 4, linewidth = 2., label = 'Im[w]')
     plt.axhline(y = limit, color = 'r', linestyle='dashed', label = 'Inequality bound', linewidth = 2.) 
+    plt.axhline(y = w_saddle[0].imag, color = 'g', linestyle='dashed', label = 'Saddle point', linewidth = 2.) 
     plt.xlabel('Iterations', fontsize = 28)
     plt.ylabel('$w$', fontsize = 28)
     plt.legend()
@@ -445,6 +490,7 @@ if __name__ == "__main__":
     plt.figure(figsize=(6., 6.))
     plt.plot(_w_samples.real, _w_samples.imag, marker='o', color = 'k', markersize = 4, linewidth = 0., label = 'Aux. Field Theory')
     plt.axhline(y = limit, color = 'r', linestyle='dashed', label = 'Inequality bound', linewidth = 2.) 
+    plt.scatter(np.array([w_saddle[0].real]), np.array([w_saddle[0].imag]), linewidth = 0., color = 'r', label = 'Saddle point') 
     plt.xlabel('Re[$w$]', fontsize = 28)
     plt.ylabel('Im[$w$]', fontsize = 28)
     plt.legend()

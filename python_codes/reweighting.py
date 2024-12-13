@@ -12,9 +12,9 @@ from main import *
 
 
 ## System ## 
-_U = 1.0
-_beta = 1.0
-_mu = 1.0
+_U = 0.1538
+_beta = 100.0
+_mu = 1.10736
 ntau = 1     # keep at 1 
 _T = 1./_beta
 print(' Temperature: ' + str(1./_beta))
