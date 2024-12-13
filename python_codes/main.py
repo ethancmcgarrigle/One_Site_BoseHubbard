@@ -147,6 +147,35 @@ def tstep_ETD(_w, wforce, dt, mobility, applynoise, enforce_limit=False):
   return _w, dt
 
 
+
+def tstep_ETDRK2(_w, wforce, dt, mobility, applynoise, beta, mu, U, enforce_limit=False):
+  ''' ETDRK2 timestepper for w field'''
+  ''' wforce = w + nonlinear-terms'''
+  # linear coefficient is 1. 
+  linear_coef = np.exp(-dt*mobility*np.ones(len(_w)))
+
+  RK2_coeff = -(linear_coef -1. + dt*mobility*1.)/(dt * mobility * 1.*1.)
+
+  prev_nonlin_part = wforce - _w
+
+  # get predicted w via ETD 
+  w_predicted = np.zeros_like(_w, dtype=np.complex_)
+  w_predicted, dt = tstep_ETD(_w, wforce, dt, mobility, applynoise, False)
+
+  # Evaluate nonlinear force 
+  wforce_predicted, x, y = calc_ops_and_forces(beta, len(_w), mu, U, w_predicted, dt_scale = 1.)
+  wforce_predicted -= w_predicted # get nonlinear part  
+
+  # Take difference between current and previous nonlinear force  
+  wforce_predicted -= prev_nonlin_part 
+
+
+  _w = w_predicted + (RK2_coeff*wforce_predicted) 
+  
+  return _w, dt
+
+
+
 def project_w(_w, _v, _beta, _mu, _U, dt):
   #eps = 1E-12
   eps = 0.0001
@@ -200,7 +229,7 @@ def calc_ops_and_forces(beta, ntau, mu, U, w_field, dt_scale = 1.):
   #dS_dw += N_tmp * 1j * np.sqrt(U * beta / ntau)
 
   _penalty_strength = 1.00
-  _penalty_width = 0.001   # good for mu/U ~ 1 
+  _penalty_width = 0.0005   # good for mu/U ~ 1 
   #_penalty_width = 0.0005    # good for mu/U >> 1
   dS_dw -= (1./np.sqrt(beta*U)) * np.pi * smeared_delta(_w, limit, _penalty_width, _penalty_strength)
 
@@ -342,7 +371,8 @@ if __name__ == "__main__":
     if(_isEM):
       _w, _dt = tstep_EM(_w, _wforce, _dt, _mobility, _applynoise, False)
     else:
-      _w, _dt = tstep_ETD(_w, _wforce, _dt, _mobility, _applynoise, False)
+      _w, _dt = tstep_ETDRK2(_w, _wforce, _dt, _mobility, _applynoise, _beta, _mu, _U, False)
+      #_w, _dt = tstep_ETD(_w, _wforce, _dt, _mobility, _applynoise, False)
     
     # project _w s.t. the inequality constraint is obeyed: h<0
     #_w, _v = project_w(_w, _v, _beta, _mu, _U, _dt)
