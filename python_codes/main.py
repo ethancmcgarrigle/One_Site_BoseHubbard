@@ -8,6 +8,7 @@ import pdb
 from single_site_BH_reference import *
 from mpmath import *
 mp.pretty = True
+from scipy.stats import sem 
 
 
 def select_dt(dt, wforce, Kref):
@@ -60,8 +61,9 @@ def Gaussian_force(w, w_max, var, amplitude = 1.):
 
 def smeared_delta(w, w_max, var, amplitude = 1.):
   eps = 1e-12
-  force = np.zeros_like(w, dtype=np.complex_)
-  force = (w.imag - w_max + eps)**2. 
+  force = np.zeros_like(w, dtype=np.complex_) 
+  #force = force - w_max
+  force = (w.imag - w_max + eps)**2
   force += var**2
   force = 1./force
   force *= -1.*var/np.pi
@@ -228,16 +230,21 @@ def calc_ops_and_forces(beta, ntau, mu, U, w_field, dt_scale = 1.):
   dS_dw += N_tmp * 1j * np.sqrt(U * beta)
   #dS_dw += N_tmp * 1j * np.sqrt(U * beta / ntau)
 
+  limit = -beta * (mu + 0.5*U) / np.sqrt(beta * U) 
   _penalty_strength = 1.00
-  _penalty_width = 0.0005   # good for mu/U ~ 1 
+  #_penalty_width = 0.0005   # good for mu/U ~ 1 
+  #_penalty_width = 0.001  # good for mu/U ~ 1 
+  _penalty_width = 0.001   # good for mu/U ~ 1 
   #_penalty_width = 0.0005    # good for mu/U >> 1
-  dS_dw -= (1./np.sqrt(beta*U)) * np.pi * smeared_delta(_w, limit, _penalty_width, _penalty_strength)
+  #dS_dw -= (1./np.sqrt(beta*U)) * np.pi * smeared_delta(w_field, limit, _penalty_width, _penalty_strength)
+  #dS_dw -= (1./np.sqrt(beta*U)) * np.pi * smeared_delta(w_field, limit, _penalty_width, _penalty_strength)
+  dS_dw -= np.pi * smeared_delta(w_field, limit, _penalty_width, _penalty_strength)
 
-  #dS_dw -= (1./np.sqrt(beta*U)) * np.pi * lorentzian(_w, limit, _penalty_width, _penalty_strength)
+  #dS_dw -= (1./np.sqrt(beta*U)) * np.pi * lorentzian(w_field, limit, _penalty_width, _penalty_strength)
 
-  #dS_dw -= (np.sqrt(beta/U)**(-1.)) * np.pi * smeared_delta(_w, limit, _penalty_width, _penalty_strength)
-  #dS_dw -= (np.sqrt(beta/U)**(-1.)) * np.pi * Gaussian_force(_w, limit, _penalty_width, _penalty_strength)
-  #dS_dw -= (np.sqrt(beta * U)**-1.) * np.pi * Gaussian_force(_w, limit, _penalty_width, _penalty_strength)
+  #dS_dw -= (np.sqrt(beta/U)**(-1.)) * np.pi * smeared_delta(w_field, limit, _penaltyw_fieldidth, _penalty_strength)
+  #dS_dw -= (np.sqrt(beta/U)**(-1.)) * np.pi * Gaussian_force(w_field, limit, _penaltyw_fieldidth, _penalty_strength)
+  #dS_dw -= (np.sqrt(beta * U)**-1.) * np.pi * Gaussian_force(w_field, limit, _penaltyw_fieldidth, _penalty_strength)
   return (dS_dw, N_tmp, U_tmp)
 
 
@@ -267,17 +274,21 @@ def return_saddle_pt(beta, mu, U, w_init):
 
 
 
-if __name__ == "__main__":
-  ''' Script to run a CL simulation of the single-site Bose Hubbard model in the auxiliary variable representation'''
+
+
+
+def auxiliary_field_CL(_U, _beta, _mu, _isPlotting = False, suppress_output = False):
   ## System ## 
-  _U = 1.00
-  _beta = 1.0
-  _mu = 1.1
+ #  _U = 2.00
+ #  _beta = 10.00
+ #  _mu = 1.0
   ntau = 1     # keep at 1 
   _T = 1./_beta
 
+  print(' Chemical Potential : ' + str(_mu) )
+  print(' Interaction strength: ' + str(_U) )
   print(' Temperature: ' + str(1./_beta))
-  print(' Imaginary time discertization: ' + str(_beta / ntau) + '\n')
+  #print(' Imaginary time discretization: ' + str(_beta / ntau) + '\n')
   
   # Create and initialize w fields 
   _w = np.zeros(ntau, dtype=np.complex_) 
@@ -303,8 +314,7 @@ if __name__ == "__main__":
   
   
   ## Numerics ## 
-  _dt = 0.001
-  #_dt = 0.01
+  _dt = 0.005
   _dt_nominal = _dt
   numtsteps = int(500000)
   iointerval = 1000
@@ -317,10 +327,6 @@ if __name__ == "__main__":
 
   _applynoise = True
   _MF_tol = 1E-6
-  
-  ## Plotting/Output ## 
-  _isPlotting = True
-  
   
   # Operators 
   N_avg = 0. + 1j*0.
@@ -350,6 +356,7 @@ if __name__ == "__main__":
   
   
   _Kref = 1E-2
+  #_Kref = 2E-3
   #_Kref = 5E-4
   print('Starting simulation')
   adaptive_timestepping = True
@@ -371,8 +378,8 @@ if __name__ == "__main__":
     if(_isEM):
       _w, _dt = tstep_EM(_w, _wforce, _dt, _mobility, _applynoise, False)
     else:
-      _w, _dt = tstep_ETDRK2(_w, _wforce, _dt, _mobility, _applynoise, _beta, _mu, _U, False)
-      #_w, _dt = tstep_ETD(_w, _wforce, _dt, _mobility, _applynoise, False)
+      _w, _dt = tstep_ETD(_w, _wforce, _dt, _mobility, _applynoise, False)
+      #_w, _dt = tstep_ETDRK2(_w, _wforce, _dt, _mobility, _applynoise, _beta, _mu, _U, False)
     
     # project _w s.t. the inequality constraint is obeyed: h<0
     #_w, _v = project_w(_w, _v, _beta, _mu, _U, _dt)
@@ -397,7 +404,8 @@ if __name__ == "__main__":
         N2_avg /= iointerval
         U2_avg /= iointerval
         U_avg /= iointerval
-        print('Completed ' + str(i) + ' steps. Particle number block avg = ' + str(N_avg) )
+        if(not suppress_output): 
+          print('Completed ' + str(i) + ' steps. Particle number block avg = ' + str(N_avg) )
         Partnum_per_site_samples[ctr] = N_avg
         N2_samples[ctr] = N2_avg
         U_samples[ctr] = U_avg
@@ -424,10 +432,20 @@ if __name__ == "__main__":
         print('The mean-field particle number (per site) is  ' + str(N_sample))
         break
   
+
+  print('Simulation finished. Computing averages of operators')
   
   thermal_avg_N = np.mean(Partnum_per_site_samples)
   thermal_avg_N2 = np.mean(N2_samples)
+  thermal_avg_U = np.mean(U_samples).real
+  thermal_avg_U2 = np.mean(U2_samples).real
   thermal_avg_w = np.mean(_w_samples)
+
+  # Calculate standard error
+  N_err = sem(Partnum_per_site_samples.real)
+  N2_err = sem(N2_samples.real)
+  U_err = sem(U_samples.real)
+  U2_err = sem(U2_samples.real)
   
   if(_applynoise):
     print('Average particle number (real) : ' + str(thermal_avg_N.real) + '\n')
@@ -446,7 +464,11 @@ if __name__ == "__main__":
   print('Contour integration references')
   N_contour_wrong, U_contour_wrong = contour_integration_ref(_beta, _mu, _U, 0., False)
   N_contour_correct, U_contour_correct = contour_integration_ref(_beta, _mu, _U, 1j*(limit - 0.25), False)
-  
+
+  # Output the results 
+  #title = 'beta_'  + str(_beta) + '_U_' + str(_U) + '_mu_' + str(mu)
+  #np.savetxt('Jeq1_CL_data.dat', np.column_stack([1./B, Mabs, Mabs_errs, Cv, Cv_errs]), header = 'T M_abs M_abs_err Cv Cv_err')
+  ops = [thermal_avg_N.real, N_err, thermal_avg_N2.real, N2_err, thermal_avg_U, U_err, thermal_avg_U2, U2_err]
   
   plt.style.use('~/tools_csbosons/python_plot_styles/plot_style_data.txt')  
   
@@ -533,4 +555,20 @@ if __name__ == "__main__":
    #  plt.legend()
    #  plt.show()
    # 
+  return ops
   
+
+
+
+if __name__ == "__main__":
+  ''' Script to run a CL simulation of the single-site Bose Hubbard model in the auxiliary variable representation'''
+
+  plot_results = False
+  U = 1.0
+  beta = 1.0
+  mu = 1.0
+  #operators, reference = auxiliary_field_CL(U, beta, mu, plot_results)  
+  ops_list = auxiliary_field_CL(U, beta, mu, plot_results, False) 
+
+  print(ops_list)
+

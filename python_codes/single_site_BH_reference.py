@@ -44,32 +44,34 @@ def calculate_U_avg(beta, mu, U, Z, N_terms, calc_U_squared):
     return results
 
 
-def display_averages(N_ops, U_ops, method_str = 'sum over states'):
+def display_averages(N_ops, U_ops, method_str = 'sum over states', suppress_output=False):
   ''' Each argument is a list of the operators '''   
   N_op = N_ops[0]
   U_op = U_ops[0]
   print()
-  print('Single site Bose Hubbard model, ' + method_str + ' reference results\n')
-  print('Average particle number : ' + str(N_op) + '\n')
-  print('Average internal energy : ' + str(U_op) + '\n')
+  if(not suppress_output):
+    print('Single site Bose Hubbard model, ' + method_str + ' reference results\n')
+    print('Average particle number : ' + str(N_op) + '\n')
+    print('Average internal energy : ' + str(U_op) + '\n')
  
   if( len(N_ops) > 1):
     N2_avg = N_ops[1]
 
   if( len(U_ops) > 1):
     U2_avg = U_ops[1]
-    print('Average particle number squared : ' + str(N2_avg) + '\n')
-    print('Average internal energy squared : ' + str(U2_avg) + '\n')
+    if(not suppress_output):
+      print('Average particle number squared : ' + str(N2_avg) + '\n')
+      print('Average internal energy squared : ' + str(U2_avg) + '\n')
 
 
 
 
-def generate_reference(beta, mu, U, N = 500, calcSquared_ops=False):
+def generate_reference(beta, mu, U, N = 500, calcSquared_ops=False, suppress_output=False):
   Z = calculate_Z(beta, mu, U, N)
   N_list = calculate_N_avg(beta, mu, U, Z, N, calcSquared_ops)
   U_list = calculate_U_avg(beta, mu, U, Z, N, calcSquared_ops) 
 
-  display_averages(N_list, U_list)  
+  display_averages(N_list, U_list, 'Sum over states', suppress_output)  
 
   return N_list[0], U_list[0]
 
@@ -140,7 +142,7 @@ def contour_integration_ref(beta, mu, U, w_imag_ref, calcSquared_ops = False, di
      U_results.append(U2_tmp.real)
 
    if(display_results):
-     display_averages(N_results, U_results, 'contour integration')  
+     display_averages(N_results, U_results, 'contour integration', display_results)  
 
    return N_avg, U_avg
 
@@ -160,9 +162,9 @@ if __name__ == "__main__":
      average site occupation (N) 
      average interal energy (U) 
   '''
-  _beta = 100.0
-  _mu = 1.10736
-  _U = 0.1538
+  _beta = 1.0
+  _mu = 1.10
+  _U = 5.00
 
   limit = -_beta * (_mu + 0.5*_U) / np.sqrt(_beta * _U) 
 
