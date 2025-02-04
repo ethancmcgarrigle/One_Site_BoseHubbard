@@ -163,8 +163,8 @@ if __name__ == "__main__":
      average interal energy (U) 
   '''
   _beta = 1.0
-  _mu = 1.10
-  _U = 5.00
+  _mu = 0.50
+  _U = 1.00
 
   limit = -_beta * (_mu + 0.5*_U) / np.sqrt(_beta * _U) 
 
